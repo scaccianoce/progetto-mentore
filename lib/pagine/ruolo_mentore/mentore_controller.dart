@@ -97,7 +97,7 @@ class MentoreController extends ChangeNotifier {
               (d) => d['user_id'] == ins['docente_id'],
               orElse: () => <String, dynamic>{},
             );
-            final team = assegnazioni
+            final List<Map<String, dynamic>> teamNonOrdinato = assegnazioni
                 .where((a) => a['mentoraggio_id'] == m['id'])
                 .map((a) {
                   final persona = personeTeam.firstWhere(
@@ -107,6 +107,16 @@ class MentoreController extends ChangeNotifier {
                   return <String, dynamic>{...persona, 'tipo': a['tipo']};
                 })
                 .toList(growable: false);
+            final List<Map<String, dynamic>> team = <Map<String, dynamic>>[
+              ...teamNonOrdinato.where(
+                (persona) =>
+                    persona['tipo']?.toString().toLowerCase() != 'senior',
+              ),
+              ...teamNonOrdinato.where(
+                (persona) =>
+                    persona['tipo']?.toString().toLowerCase() == 'senior',
+              ),
+            ];
             return PercorsoMentore(
               mentoraggio: m,
               insegnamento: ins,
