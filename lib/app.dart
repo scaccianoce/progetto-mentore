@@ -1,0 +1,99 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import 'app_router.dart';
+import 'sessione_controller.dart';
+
+class MentoreApp extends StatefulWidget {
+  const MentoreApp({super.key, this.erroreAvvio});
+
+  final String? erroreAvvio;
+
+  @override
+  State<MentoreApp> createState() => _MentoreAppState();
+}
+
+class _MentoreAppState extends State<MentoreApp> {
+  SessioneController? sessione;
+  GoRouter? router;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.erroreAvvio == null) {
+      sessione = SessioneController()..inizializza();
+      router = creaAppRouter(sessione!);
+    }
+  }
+
+  @override
+  void dispose() {
+    router?.dispose();
+    sessione?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+      inputDecorationTheme: const InputDecorationTheme(
+        labelStyle: TextStyle(fontWeight: FontWeight.bold),
+        floatingLabelStyle: TextStyle(fontWeight: FontWeight.bold),
+      ),
+    );
+    if (widget.erroreAvvio != null) {
+      return MaterialApp(
+        title: 'Progetto Mentore per la Didattica',
+        debugShowCheckedModeBanner: false,
+        theme: tema,
+        home: _PaginaErroreAvvio(messaggio: widget.erroreAvvio!),
+      );
+    }
+    return MaterialApp.router(
+      title: 'Progetto Mentore per la Didattica',
+      debugShowCheckedModeBanner: false,
+      theme: tema,
+      routerConfig: router!,
+    );
+  }
+}
+
+class _PaginaErroreAvvio extends StatelessWidget {
+  const _PaginaErroreAvvio({required this.messaggio});
+
+  final String messaggio;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        minimum: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  Icons.cloud_off_outlined,
+                  size: 56,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Impossibile avviare l’app',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(messaggio, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
