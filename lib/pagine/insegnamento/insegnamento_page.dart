@@ -39,15 +39,30 @@ class _InsegnamentoPageState extends State<InsegnamentoPage> {
     'numero_studenti',
   };
 
-  static const Set<String> _campiData = <String>{
-    'data_inizio',
-    'data_fine',
-  };
+  static const Set<String> _campiData = <String>{'data_inizio', 'data_fine'};
 
   static const Set<String> _campiMultilinea = <String>{
     'note',
     'giorni_orari_lezioni',
   };
+
+  static const Map<String, List<String>> _opzioniCampi = <String, List<String>>{
+    'semestre': <String>['I semestre', 'II semestre', 'Annuale'],
+    'anno_erogazione': <String>[
+      '1° anno',
+      '2° anno',
+      '3° anno',
+      '4° anno',
+      '5° anno',
+    ],
+    'svolgimento': <String>['In presenza', 'Online', 'Misto'],
+  };
+
+  static const List<String> _opzioniGiaMentorato = <String>[
+    '1 volta',
+    '2 volte',
+    '3 o più volte',
+  ];
 
   @override
   void initState() {
@@ -140,14 +155,28 @@ class _InsegnamentoPageState extends State<InsegnamentoPage> {
     DateTime? dataFine = DateTime.tryParse(
       _controller.insegnamento?['data_fine']?.toString() ?? '',
     );
-    bool giaMentorato =
-        _controller.insegnamento?['gia_mentorato'] == true;
+    final String? giaMentoratoDb = _controller.insegnamento?['gia_mentorato']
+        ?.toString();
+    String? giaMentorato = _opzioniGiaMentorato.contains(giaMentoratoDb)
+        ? giaMentoratoDb
+        : null;
+    final Map<String, String> valoriScelta = <String, String>{
+      for (final MapEntry<String, List<String>> campo in _opzioniCampi.entries)
+        campo.key:
+            campo.value.contains(
+              _controller.insegnamento?[campo.key]?.toString(),
+            )
+            ? _controller.insegnamento![campo.key].toString()
+            : campo.value.first,
+    };
     final Map<String, TextEditingController> controllers = {
       for (final String chiave in campi.keys)
-        if (!_campiData.contains(chiave) && chiave != 'gia_mentorato')
-        chiave: TextEditingController(
-          text: _controller.insegnamento?[chiave]?.toString() ?? '',
-        ),
+        if (!_campiData.contains(chiave) &&
+            chiave != 'gia_mentorato' &&
+            !_opzioniCampi.containsKey(chiave))
+          chiave: TextEditingController(
+            text: _controller.insegnamento?[chiave]?.toString() ?? '',
+          ),
     };
     final bool? salva = await showDialog<bool>(
       context: context,
@@ -167,52 +196,110 @@ class _InsegnamentoPageState extends State<InsegnamentoPage> {
                       ),
                     ),
                   ...campi.entries
-                      .where((e) => !_campiData.contains(e.key) && e.key != 'gia_mentorato')
+                      .where(
+                        (e) =>
+                            !_campiData.contains(e.key) &&
+                            e.key != 'gia_mentorato',
+                      )
                       .map(
                         (e) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: TextField(
-                            controller: controllers[e.key],
-                            keyboardType: _campiNumerici.contains(e.key)
-                                ? TextInputType.number
-                                : _campiMultilinea.contains(e.key)
-                                ? TextInputType.multiline
-                                : null,
-                            minLines: _campiMultilinea.contains(e.key) ? 3 : 1,
-                            maxLines: _campiMultilinea.contains(e.key) ? 6 : 1,
-                            enabled:
-                                !bloccaDatiIdentificativi ||
-                                !<String>{'insegnamento', 'semestre'}.contains(e.key),
-                            decoration: InputDecoration(
-                              labelText: e.value,
-                              border: const OutlineInputBorder(),
-                              helperText:
-                                  bloccaDatiIdentificativi &&
-                                      <String>{
-                                        'insegnamento',
-                                        'semestre',
-                                      }.contains(e.key)
-                                  ? 'Campo riservato a organizer e owner'
-                                  : null,
-                            ),
-                          ),
+                          child: _opzioniCampi.containsKey(e.key)
+                              ? DropdownButtonFormField<String>(
+                                  initialValue: valoriScelta[e.key],
+                                  isExpanded: true,
+                                  decoration: InputDecoration(
+                                    labelText: e.value,
+                                    border: const OutlineInputBorder(),
+                                    helperText:
+                                        bloccaDatiIdentificativi &&
+                                            e.key == 'semestre'
+                                        ? 'Campo riservato a organizer e owner'
+                                        : null,
+                                  ),
+                                  items: _opzioniCampi[e.key]!
+                                      .map(
+                                        (String valore) =>
+                                            DropdownMenuItem<String>(
+                                              value: valore,
+                                              child: Text(valore),
+                                            ),
+                                      )
+                                      .toList(growable: false),
+                                  onChanged:
+                                      bloccaDatiIdentificativi &&
+                                          e.key == 'semestre'
+                                      ? null
+                                      : (String? valore) {
+                                          if (valore != null) {
+                                            setDialogState(
+                                              () =>
+                                                  valoriScelta[e.key] = valore,
+                                            );
+                                          }
+                                        },
+                                )
+                              : TextField(
+                                  controller: controllers[e.key],
+                                  keyboardType: _campiNumerici.contains(e.key)
+                                      ? TextInputType.number
+                                      : _campiMultilinea.contains(e.key)
+                                      ? TextInputType.multiline
+                                      : null,
+                                  minLines: _campiMultilinea.contains(e.key)
+                                      ? 3
+                                      : 1,
+                                  maxLines: _campiMultilinea.contains(e.key)
+                                      ? 6
+                                      : 1,
+                                  enabled:
+                                      !bloccaDatiIdentificativi ||
+                                      e.key != 'insegnamento',
+                                  decoration: InputDecoration(
+                                    labelText: e.value,
+                                    border: const OutlineInputBorder(),
+                                    helperText:
+                                        bloccaDatiIdentificativi &&
+                                            e.key == 'insegnamento'
+                                        ? 'Campo riservato a organizer e owner'
+                                        : null,
+                                  ),
+                                ),
                         ),
                       ),
                   _dataTile(
                     label: campi['data_inizio']!,
                     value: dataInizio,
-                    onChanged: (valore) => setDialogState(() => dataInizio = valore),
+                    onChanged: (valore) =>
+                        setDialogState(() => dataInizio = valore),
                   ),
                   _dataTile(
                     label: campi['data_fine']!,
                     value: dataFine,
-                    onChanged: (valore) => setDialogState(() => dataFine = valore),
+                    onChanged: (valore) =>
+                        setDialogState(() => dataFine = valore),
                   ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(campi['gia_mentorato']!),
-                    value: giaMentorato,
-                    onChanged: (valore) => setDialogState(() => giaMentorato = valore),
+                  DropdownButtonFormField<String?>(
+                    initialValue: giaMentorato,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: campi['gia_mentorato']!,
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: <DropdownMenuItem<String?>>[
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Mai o non specificato'),
+                      ),
+                      ..._opzioniGiaMentorato.map(
+                        (String valore) => DropdownMenuItem<String?>(
+                          value: valore,
+                          child: Text(valore),
+                        ),
+                      ),
+                    ],
+                    onChanged: (String? valore) =>
+                        setDialogState(() => giaMentorato = valore),
                   ),
                 ],
               ),
@@ -238,15 +325,21 @@ class _InsegnamentoPageState extends State<InsegnamentoPage> {
       }
 
       try {
-        final Map<String, dynamic> valori = <String, dynamic>{
-          for (final String chiave in campi.keys)
-            if (!_campiData.contains(chiave) && chiave != 'gia_mentorato')
-              chiave: _campiNumerici.contains(chiave)
-                  ? numero(chiave)
-                  : (controllers[chiave]!.text.trim().isEmpty
-                        ? null
-                        : controllers[chiave]!.text.trim()),
-        };
+        final Map<String, dynamic> valori = <String, dynamic>{};
+        for (final String chiave in campi.keys) {
+          if (_campiData.contains(chiave) || chiave == 'gia_mentorato') {
+            continue;
+          }
+          if (_opzioniCampi.containsKey(chiave)) {
+            valori[chiave] = valoriScelta[chiave];
+          } else {
+            valori[chiave] = _campiNumerici.contains(chiave)
+                ? numero(chiave)
+                : (controllers[chiave]!.text.trim().isEmpty
+                      ? null
+                      : controllers[chiave]!.text.trim());
+          }
+        }
         valori['data_inizio'] = dataInizio?.toIso8601String().split('T').first;
         valori['data_fine'] = dataFine?.toIso8601String().split('T').first;
         valori['gia_mentorato'] = giaMentorato;
