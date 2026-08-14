@@ -1,0 +1,469 @@
+import 'package:flutter/material.dart';
+
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../dinamico/maschera_dinamica_widget.dart';
+import 'backoffice_controller.dart';
+
+/// Gestione applicativa del partecipante su:
+/// anagrafica + anagrafica_riservata + user_roles.
+class PartecipantiBackofficePage extends StatefulWidget {
+  const PartecipantiBackofficePage({super.key, required this.controller});
+
+  final BackofficeController controller;
+
+  @override
+  State<PartecipantiBackofficePage> createState() =>
+      _PartecipantiBackofficePageState();
+}
+
+class _PartecipantiBackofficePageState
+    extends State<PartecipantiBackofficePage> {
+  final ScrollController _orizzontale = ScrollController();
+
+  BackofficeController get controller => widget.controller;
+
+  @override
+  void dispose() {
+    _orizzontale.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Partecipanti · dati da anagrafica + anagrafica_riservata',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Aggiorna',
+                  onPressed: controller.caricamento ? null : controller.carica,
+                  icon: const Icon(Icons.refresh),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: () => _nuovo(context),
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('Nuovo partecipante'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Scrollbar(
+              controller: _orizzontale,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _orizzontale,
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: 1250,
+                  child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: controller.partecipanti.length,
+              itemBuilder: (context, i) {
+                final p = controller.partecipanti[i];
+                final id = p['user_id'].toString();
+                final riservato = controller.riservati[id];
+                final ruolo = controller.ruoli[id];
+                return Card(
+                  child: ExpansionTile(
+                    leading: Icon(
+                      riservato?['attivo'] == false
+                          ? Icons.person_off_outlined
+                          : Icons.person_outline,
+                    ),
+                    title: Text('${p['cognome'] ?? ''} ${p['nome'] ?? ''}'.trim()),
+                    subtitle: Text('${p['email_unipa'] ?? ''}${ruolo == null ? '' : ' · $ruolo'}'),
+                    trailing: IconButton(
+                      tooltip: 'Modifica / elimina',
+                      onPressed: () => _azioni(context, p, riservato),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: [
+                      _SezioneDati(titolo: 'Anagrafica', dati: p),
+                      const SizedBox(height: 12),
+                      _SezioneDati(
+                        titolo: 'Anagrafica riservata',
+                        dati: riservato ?? const <String, dynamic>{},
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text('Ruolo applicativo: ${ruolo ?? '—'}'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+                    ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+
+  Future<void> _nuovo(BuildContext context) async {
+    final valori = await mostraMascheraDinamica(
+      context: context,
+      configurazione: const ConfigurazionePaginaDinamica(
+        tabella: 'anagrafica',
+        campi: <String, PersonalizzazioneCampo>{
+          'user_id': PersonalizzazioneCampo(nascosto: true),
+        },
+      ),
+      partecipante: false,
+      valoriIniziali: const <String, dynamic>{},
+      titolo: 'Nuovo partecipante',
+    );
+    if (valori == null || !context.mounted) return;
+
+    final password = await _chiediPassword(
+      context,
+      titolo: 'Password temporanea',
+      descrizione:
+          'Imposta la password iniziale del nuovo partecipante (minimo 8 caratteri).',
+    );
+    if (password == null) return;
+
+    final errore = await controller.creaPartecipante(valori, password);
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+
+  Future<void> _azioni(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+    Map<String, dynamic>? riservato,
+  ) async {
+    final scelta = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Modifica anagrafica'),
+              onTap: () => Navigator.pop(context, 'anagrafica'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.lock_outline),
+              title: const Text('Dati riservati e ruolo'),
+              onTap: () => Navigator.pop(context, 'riservati'),
+            ),
+            if (controller.soloOwner ||
+                controller.ruoli[partecipante['user_id']?.toString()] ==
+                    'participant')
+              ListTile(
+                leading: const Icon(Icons.password_outlined),
+                title: const Text('Reimposta password'),
+                onTap: () => Navigator.pop(context, 'password'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Elimina partecipante'),
+              onTap: () => Navigator.pop(context, 'elimina'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted || scelta == null) return;
+    if (scelta == 'anagrafica') {
+      final valori = await mostraMascheraDinamica(
+        context: context,
+        configurazione: const ConfigurazionePaginaDinamica(
+          tabella: 'anagrafica',
+          campi: <String, PersonalizzazioneCampo>{
+            'user_id': PersonalizzazioneCampo(solaLettura: true),
+          },
+        ),
+        partecipante: false,
+        valoriIniziali: partecipante,
+        titolo: 'Modifica partecipante',
+      );
+      if (valori == null) return;
+      final errore = await controller.salvaAnagrafica(
+        partecipante['user_id'].toString(),
+        valori,
+        originali: partecipante,
+      );
+      if (!context.mounted) return;
+      _mostraErrore(context, errore);
+      return;
+    }
+    if (scelta == 'riservati') {
+      await _modificaRiservati(context, partecipante, riservato);
+      return;
+    }
+    if (scelta == 'password') {
+      await _reimpostaPassword(context, partecipante);
+      return;
+    }
+    if (scelta == 'elimina') {
+      final conferma = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Eliminare il partecipante?'),
+          content: const Text(
+            'La cancellazione puo essere bloccata dal database se esistono dati storici collegati.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Elimina'),
+            ),
+          ],
+        ),
+      );
+      if (conferma != true) return;
+      final errore = await controller.eliminaPartecipante(
+        partecipante['user_id'].toString(),
+      );
+      if (!context.mounted) return;
+      _mostraErrore(context, errore);
+    }
+  }
+
+  Future<void> _reimpostaPassword(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+  ) async {
+    final id = partecipante['user_id']?.toString();
+    if (id == null || id.isEmpty) return;
+    final nome = '${partecipante['cognome'] ?? ''} ${partecipante['nome'] ?? ''}'.trim();
+    final password = await _chiediPassword(
+      context,
+      titolo: 'Reimposta password',
+      descrizione: 'Nuova password temporanea per $nome (minimo 8 caratteri).',
+    );
+    if (password == null) return;
+    final errore = await controller.reimpostaPassword(id, password);
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+
+  Future<String?> _chiediPassword(
+    BuildContext context, {
+    required String titolo,
+    required String descrizione,
+  }) async {
+    final password = TextEditingController();
+    final conferma = TextEditingController();
+    String? errore;
+    final risultato = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(titolo),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(descrizione),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password'),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: conferma,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Conferma password'),
+                ),
+                if (errore != null) ...[
+                  const SizedBox(height: 8),
+                  Text(errore!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final valore = password.text;
+                if (valore.length < 8) {
+                  setState(() => errore = 'Minimo 8 caratteri.');
+                  return;
+                }
+                if (valore != conferma.text) {
+                  setState(() => errore = 'Le password non coincidono.');
+                  return;
+                }
+                Navigator.pop(context, valore);
+              },
+              child: const Text('Conferma'),
+            ),
+          ],
+        ),
+      ),
+    );
+    password.dispose();
+    conferma.dispose();
+    return risultato;
+  }
+
+  Future<void> _modificaRiservati(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+    Map<String, dynamic>? riservato,
+  ) async {
+    final note = TextEditingController(
+      text: riservato?['note_storiche']?.toString() ?? '',
+    );
+    var attivo = riservato?['attivo'] != false;
+    String? ruolo = controller.ruoli[partecipante['user_id'].toString()];
+    final salva = await showDialog<bool>(
+          context: context,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: Text('${partecipante['cognome'] ?? ''} ${partecipante['nome'] ?? ''}'),
+              content: SizedBox(
+                width: 480,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Partecipante attivo'),
+                      value: attivo,
+                      onChanged: (v) => setDialogState(() => attivo = v),
+                    ),
+                    TextField(
+                      controller: note,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'Note storiche riservate'),
+                    ),
+                    // Il cambio di ruolo resta owner-only: l'organizer gestisce
+                    // il partecipante ma non puo elevare privilegi applicativi.
+                    if (controller.soloOwner && controller.ruoliDisponibili.isNotEmpty)
+                      DropdownButtonFormField<String>(
+                        initialValue: ruolo,
+                        decoration: const InputDecoration(labelText: 'Ruolo applicativo'),
+                        items: controller.ruoliDisponibili
+                            .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                            .toList(growable: false),
+                        onChanged: (v) => ruolo = v,
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Annulla'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Salva'),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        false;
+    if (!salva) {
+      note.dispose();
+      return;
+    }
+    var errore = await controller.salvaRiservati(
+      partecipante['user_id'].toString(),
+      attivo,
+      note.text,
+    );
+    final ruoloSelezionato = ruolo;
+    if (errore == null &&
+        controller.soloOwner &&
+        ruoloSelezionato != null &&
+        ruoloSelezionato != controller.ruoli[partecipante['user_id'].toString()]) {
+      errore = await controller.cambiaRuolo(
+        partecipante['user_id'].toString(),
+        ruoloSelezionato,
+      );
+    }
+    note.dispose();
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+}
+
+
+class _SezioneDati extends StatelessWidget {
+  const _SezioneDati({required this.titolo, required this.dati});
+
+  final String titolo;
+  final Map<String, dynamic> dati;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(titolo, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 6),
+          if (dati.isEmpty)
+            const Text('—')
+          else
+            Wrap(
+              spacing: 20,
+              runSpacing: 8,
+              children: [
+                for (final voce in dati.entries.where((voce) => voce.key != 'user_id'))
+                  SizedBox(
+                    width: 300,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${_etichetta(voce.key)}: ',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: _valore(voce.value)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      );
+}
+
+String _etichetta(String nome) {
+  if (nome.isEmpty) return nome;
+  final testo = nome.replaceAll('_', ' ');
+  return '${testo[0].toUpperCase()}${testo.substring(1)}';
+}
+
+String _valore(Object? valore) {
+  if (valore == null) return '—';
+  if (valore is bool) return valore ? 'Sì' : 'No';
+  final testo = valore.toString();
+  return testo.isEmpty ? '—' : testo;
+}
+
+void _mostraErrore(BuildContext context, String? errore) {
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(errore ?? 'Operazione completata.')),
+  );
+}

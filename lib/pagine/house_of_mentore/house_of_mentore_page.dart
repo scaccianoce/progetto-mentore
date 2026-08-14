@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../template/componenti_pagina_dinamica.dart';
+import '../template/template_elenco_dettaglio_page.dart';
 import 'house_of_mentore_controller.dart';
 
 class HouseOfMentorePage extends StatefulWidget {
@@ -14,6 +18,45 @@ class HouseOfMentorePage extends StatefulWidget {
 
 class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
   late final HouseOfMentoreController controller;
+
+  bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
+
+  /// PERSONALIZZAZIONE HOUSE OF MENTORE:
+  /// il layout resta nel template, qui rimangono solo tipi e vincoli speciali.
+  ConfigurazionePaginaDinamica get _configurazioneEvento =>
+      ConfigurazionePaginaDinamica(
+        tabella: 'house_of_mentore',
+        campi: <String, PersonalizzazioneCampo>{
+          'titolo': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          'descrizione': const PersonalizzazioneCampo(
+            tipo: TipoCampoDinamico.testoFormattato,
+            modificabilePartecipante: false,
+          ),
+          'anno_accademico': PersonalizzazioneCampo(
+            tipo: TipoCampoDinamico.scelta,
+            valoriScelta: controller.anniAccademici,
+            modificabilePartecipante: false,
+          ),
+          for (final campo in <String>[
+            'data_evento',
+            'luogo',
+            'locandina_url',
+            'iscrizioni_aperte',
+          ])
+            campo: const PersonalizzazioneCampo(
+              modificabilePartecipante: false,
+            ),
+        },
+      );
+
+  static const _configurazioneOpzione = ConfigurazionePaginaDinamica(
+    tabella: 'house_of_mentore_opzioni',
+    campi: <String, PersonalizzazioneCampo>{
+      'evento_id': PersonalizzazioneCampo(nascosto: true),
+    },
+  );
 
   @override
   void initState() {
@@ -30,94 +73,38 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
-    builder: (context, _) => Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'House of Mentore',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Aggiorna',
-                onPressed: controller.carica,
-                icon: const Icon(Icons.refresh),
-              ),
-              if (controller.puoGestire)
-                FilledButton.icon(
-                  onPressed: () => _apriEditorEvento(),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Nuovo'),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Expanded(child: _contenuto()),
-        ],
+    builder: (context, _) => TemplatePaginaElencoDettaglio(
+      caricamento: controller.caricamento && controller.eventi.isEmpty,
+      errore: controller.errore,
+      vuoto: controller.eventi.isEmpty,
+      messaggioVuoto: 'Nessuna iniziativa disponibile.',
+      larghezzaElenco: 340,
+      intestazione: IntestazionePaginaDinamica(
+        titolo: 'House of Mentore',
+        onAggiorna: controller.carica,
+        onNuovo: controller.puoGestire ? () => _apriEditorEvento() : null,
       ),
-    ),
-  );
-
-  Widget _contenuto() {
-    if (controller.caricamento && controller.eventi.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (controller.errore != null && controller.eventi.isEmpty) {
-      return Center(child: Text(controller.errore!));
-    }
-    if (controller.eventi.isEmpty) {
-      return const Center(child: Text('Nessuna iniziativa disponibile.'));
-    }
-
-    final elenco = _elenco();
-    final dettaglio = _dettaglio(controller.eventoSelezionato!);
-    return LayoutBuilder(
-      builder: (context, vincoli) {
-        if (vincoli.maxWidth >= 850) {
-          return Row(
-            children: [
-              SizedBox(width: 340, child: elenco),
-              const VerticalDivider(width: 24),
-              Expanded(child: dettaglio),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            SizedBox(height: 220, child: elenco),
-            const Divider(height: 24),
-            Expanded(child: dettaglio),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _elenco() => ListView.builder(
-    itemCount: controller.eventi.length,
-    itemBuilder: (context, indice) {
-      final evento = controller.eventi[indice];
-      final id = evento['id'].toString();
-      return ListTile(
-        selected: id == controller.eventoSelezionatoId,
-        leading: const Icon(Icons.home_work_outlined),
-        title: Text(
-          _testo(evento['titolo']),
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${_data(evento['data_evento'])} · ${_testo(evento['anno_accademico'])}',
-        ),
-        trailing: controller.iscrizione(id) == null
+      elenco: ElencoRecordDinamico<Map<String, dynamic>>(
+        elementi: controller.eventi,
+        idSelezionato: controller.eventoSelezionatoId,
+        id: (evento) => evento['id'].toString(),
+        titolo: (evento) => _testo(evento['titolo']),
+        sottotitolo: (evento) =>
+            '${_data(evento['data_evento'])} · ${_testo(evento['anno_accademico'])}',
+        leading: (_) => const Icon(Icons.home_work_outlined),
+        trailing: (evento) =>
+            controller.iscrizione(evento['id'].toString()) == null
             ? null
             : const Icon(Icons.check_circle, color: Colors.green),
-        onTap: () => controller.seleziona(evento),
-      );
-    },
+        onSeleziona: controller.seleziona,
+      ),
+      dettaglio: controller.eventoSelezionato == null
+          ? const Center(child: Text('Seleziona un’iniziativa.'))
+          : Card(
+              margin: EdgeInsets.zero,
+              child: _dettaglio(controller.eventoSelezionato!),
+            ),
+    ),
   );
 
   Widget _dettaglio(Map<String, dynamic> evento) {
@@ -127,133 +114,164 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     final iscrizioniAperte = evento['iscrizioni_aperte'] == true;
     final locandina = _testo(evento['locandina_url']);
 
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 850),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (locandina.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.network(
-                    locandina,
-                    height: 260,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) => const SizedBox(
-                      height: 100,
-                      child: Center(child: Text('Locandina non disponibile.')),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Text(
-                _testo(evento['titolo']),
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.blue.shade800,
-                  fontWeight: FontWeight.bold,
-                ),
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: <Widget>[
+        if (locandina.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.network(
+              locandina,
+              height: 260,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const SizedBox(
+                height: 100,
+                child: Center(child: Text('Locandina non disponibile.')),
               ),
-              const SizedBox(height: 12),
-              _riga('Anno accademico', evento['anno_accademico']),
-              _riga('Data', _data(evento['data_evento'])),
-              _riga('Luogo', evento['luogo']),
-              _riga('Descrizione', evento['descrizione']),
-              const Divider(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Alternative di partecipazione',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  if (controller.puoGestire)
-                    TextButton.icon(
-                      onPressed: () => _apriEditorOpzione(eventoId),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Aggiungi'),
-                    ),
-                ],
+            ),
+          ),
+        CampiTabellaDinamici(
+          configurazione: _configurazioneEvento,
+          valori: evento,
+          partecipante: _partecipante,
+        ),
+        const Divider(height: 32),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                'Alternative di partecipazione',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-              if (opzioni.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text('Le alternative non sono ancora disponibili.'),
-                )
-              else
-                for (final opzione in opzioni)
-                  _OpzioneTile(
-                    opzione: opzione,
-                    selezionata:
-                        iscrizione?['opzione_id']?.toString() ==
-                        opzione['id'].toString(),
-                    abilitata: iscrizioniAperte,
-                    puoGestire: controller.puoGestire,
-                    onScegli: () => _scegli(eventoId, opzione['id'].toString()),
-                    onModifica: () =>
-                        _apriEditorOpzione(eventoId, opzione: opzione),
-                    onElimina: () => _eliminaOpzione(opzione),
-                  ),
-              if (!iscrizioniAperte)
-                const Padding(
-                  padding: EdgeInsets.only(top: 12),
-                  child: Text('Le iscrizioni non sono aperte.'),
-                ),
-              if (iscrizione != null) ...[
-                const SizedBox(height: 12),
-                TextButton.icon(
-                  onPressed: iscrizioniAperte
-                      ? () => _cancellaIscrizione(eventoId)
-                      : null,
-                  icon: const Icon(Icons.event_busy),
-                  label: const Text('Cancella la mia iscrizione'),
-                ),
-              ],
-              if (controller.puoGestire) ...[
-                const Divider(height: 32),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => _apriEditorEvento(evento),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Modifica evento'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => _eliminaEvento(evento),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('Elimina evento'),
-                    ),
-                  ],
-                ),
-              ],
+            ),
+            if (controller.puoGestire)
+              TextButton.icon(
+                onPressed: () => _apriEditorOpzione(eventoId),
+                icon: const Icon(Icons.add),
+                label: const Text('Aggiungi'),
+              ),
+          ],
+        ),
+        if (opzioni.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Text('Le alternative non sono ancora disponibili.'),
+          )
+        else
+          for (final opzione in opzioni)
+            _OpzioneTile(
+              opzione: opzione,
+              selezionata:
+                  iscrizione?['opzione_id']?.toString() ==
+                  opzione['id'].toString(),
+              abilitata: iscrizioniAperte,
+              puoGestire: controller.puoGestire,
+              onScegli: () => _scegli(eventoId, opzione['id'].toString()),
+              onModifica: () => _apriEditorOpzione(eventoId, opzione: opzione),
+              onElimina: () => _eliminaOpzione(opzione),
+            ),
+        if (!iscrizioniAperte)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text('Le iscrizioni non sono aperte.'),
+          ),
+        if (iscrizione != null)
+          TextButton.icon(
+            onPressed: iscrizioniAperte
+                ? () => _cancellaIscrizione(eventoId)
+                : null,
+            icon: const Icon(Icons.event_busy),
+            label: const Text('Cancella la mia iscrizione'),
+          ),
+        if (controller.puoGestire) ...<Widget>[
+          const Divider(height: 32),
+          _elencoIscritti(evento),
+          const Divider(height: 32),
+          Wrap(
+            spacing: 8,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () => _apriEditorEvento(evento),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Modifica evento'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _eliminaEvento(evento),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Elimina evento'),
+              ),
             ],
           ),
-        ),
-      ),
+        ],
+      ],
     );
   }
 
-  Widget _riga(String etichetta, Object? valore) {
-    final testo = _testo(valore);
-    if (testo.isEmpty || testo == '—') {
-      return const SizedBox.shrink();
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$etichetta: ',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            TextSpan(text: testo),
-          ],
+  Widget _elencoIscritti(Map<String, dynamic> evento) {
+    final eventoId = evento['id'].toString();
+    final iscritti = controller.iscritti(eventoId);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Iscritti (${iscritti.length})',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      ),
+        const SizedBox(height: 8),
+        if (iscritti.isEmpty)
+          const Text('Nessun partecipante iscritto.')
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const <DataColumn>[
+                DataColumn(label: Text('#'), numeric: true),
+                DataColumn(label: Text('Partecipante')),
+                DataColumn(label: Text('Opzione scelta')),
+                DataColumn(label: Text('Presente')),
+              ],
+              rows: <DataRow>[
+                for (var indice = 0; indice < iscritti.length; indice++)
+                  DataRow(
+                    cells: <DataCell>[
+                      DataCell(Text('${indice + 1}')),
+                      DataCell(
+                        Text(
+                          controller.nomePartecipante(
+                            iscritti[indice]['partecipante_id']?.toString() ?? '',
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        Text(
+                          controller.descrizioneOpzione(
+                            eventoId,
+                            iscritti[indice]['opzione_id'],
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        Checkbox(
+                          value: iscritti[indice]['presente'] == true,
+                          onChanged: (valore) async {
+                            if (valore == null) return;
+                            final errore = await controller.aggiornaPresenza(
+                              eventoId: eventoId,
+                              partecipanteId:
+                                  iscritti[indice]['partecipante_id']?.toString() ?? '',
+                              presente: valore,
+                            );
+                            _esito(errore, 'Presenza aggiornata.');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -270,24 +288,28 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
       'Cancellare l’iscrizione?',
       'Potrai iscriverti nuovamente finché le iscrizioni saranno aperte.',
     );
-    if (!conferma) {
-      return;
-    }
+    if (!conferma) return;
     final errore = await controller.cancellaIscrizione(eventoId);
     _esito(errore, 'Iscrizione cancellata.');
   }
 
   Future<void> _apriEditorEvento([Map<String, dynamic>? evento]) async {
-    final dati = await showDialog<Map<String, dynamic>>(
+    final dati = await mostraMascheraDinamica(
       context: context,
-      builder: (_) => _EventoHouseEditor(
-        evento: evento,
-        anniAccademici: controller.anniAccademici,
-      ),
+      configurazione: _configurazioneEvento,
+      valoriIniziali:
+          evento ??
+          <String, dynamic>{
+            'titolo': '',
+            'anno_accademico': controller.anniAccademici.isEmpty
+                ? null
+                : controller.anniAccademici.first,
+            'iscrizioni_aperte': false,
+          },
+      partecipante: _partecipante,
+      titolo: evento == null ? 'Nuovo evento' : 'Modifica evento',
     );
-    if (dati == null) {
-      return;
-    }
+    if (dati == null) return;
     final errore = await controller.salvaEvento(
       id: evento?['id']?.toString(),
       dati: dati,
@@ -295,36 +317,41 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Evento salvato.');
   }
 
+  Future<void> _apriEditorOpzione(
+    String eventoId, {
+    Map<String, dynamic>? opzione,
+  }) async {
+    final dati = await mostraMascheraDinamica(
+      context: context,
+      configurazione: _configurazioneOpzione,
+      valoriIniziali:
+          opzione ??
+          <String, dynamic>{
+            'evento_id': eventoId,
+            'descrizione': '',
+            'ordine_visualizzazione': 0,
+          },
+      partecipante: false,
+      titolo: opzione == null ? 'Nuova alternativa' : 'Modifica alternativa',
+    );
+    if (dati == null) return;
+    final errore = await controller.salvaOpzione(
+      id: opzione?['id']?.toString(),
+      eventoId: eventoId,
+      descrizione: dati['descrizione'].toString(),
+      ordine: (dati['ordine_visualizzazione'] as num).toInt(),
+    );
+    _esito(errore, 'Alternativa salvata.');
+  }
+
   Future<void> _eliminaEvento(Map<String, dynamic> evento) async {
     final conferma = await _conferma(
       'Eliminare House of Mentore?',
       'Verranno eliminate anche le relative alternative.',
     );
-    if (!conferma) {
-      return;
-    }
+    if (!conferma) return;
     final errore = await controller.eliminaEvento(evento['id'].toString());
     _esito(errore, 'Evento eliminato.');
-  }
-
-  Future<void> _apriEditorOpzione(
-    String eventoId, {
-    Map<String, dynamic>? opzione,
-  }) async {
-    final dati = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (_) => _OpzioneEditor(opzione: opzione),
-    );
-    if (dati == null) {
-      return;
-    }
-    final errore = await controller.salvaOpzione(
-      id: opzione?['id']?.toString(),
-      eventoId: eventoId,
-      descrizione: dati['descrizione'].toString(),
-      ordine: dati['ordine_visualizzazione'] as int,
-    );
-    _esito(errore, 'Alternativa salvata.');
   }
 
   Future<void> _eliminaOpzione(Map<String, dynamic> opzione) async {
@@ -332,9 +359,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
       'Eliminare l’alternativa?',
       _testo(opzione['descrizione']),
     );
-    if (!conferma) {
-      return;
-    }
+    if (!conferma) return;
     final errore = await controller.eliminaOpzione(opzione['id'].toString());
     _esito(errore, 'Alternativa eliminata.');
   }
@@ -345,7 +370,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
         builder: (context) => AlertDialog(
           title: Text(titolo),
           content: Text(testo),
-          actions: [
+          actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Annulla'),
@@ -360,9 +385,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
       false;
 
   void _esito(String? errore, String successo) {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(errore ?? successo)));
@@ -403,14 +426,9 @@ class _OpzioneTile extends StatelessWidget {
       onTap: abilitata ? onScegli : null,
       trailing: puoGestire
           ? PopupMenuButton<String>(
-              onSelected: (valore) {
-                if (valore == 'modifica') {
-                  onModifica();
-                } else {
-                  onElimina();
-                }
-              },
-              itemBuilder: (_) => const [
+              onSelected: (valore) =>
+                  valore == 'modifica' ? onModifica() : onElimina(),
+              itemBuilder: (_) => const <PopupMenuEntry<String>>[
                 PopupMenuItem(value: 'modifica', child: Text('Modifica')),
                 PopupMenuItem(value: 'elimina', child: Text('Elimina')),
               ],
@@ -420,283 +438,11 @@ class _OpzioneTile extends StatelessWidget {
   );
 }
 
-class _EventoHouseEditor extends StatefulWidget {
-  const _EventoHouseEditor({
-    required this.evento,
-    required this.anniAccademici,
-  });
-
-  final Map<String, dynamic>? evento;
-  final List<String> anniAccademici;
-
-  @override
-  State<_EventoHouseEditor> createState() => _EventoHouseEditorState();
-}
-
-class _EventoHouseEditorState extends State<_EventoHouseEditor> {
-  final form = GlobalKey<FormState>();
-  late final TextEditingController titolo;
-  late final TextEditingController descrizione;
-  late final TextEditingController luogo;
-  late final TextEditingController locandina;
-  DateTime? data;
-  String? anno;
-  bool iscrizioniAperte = false;
-
-  @override
-  void initState() {
-    super.initState();
-    titolo = TextEditingController(text: _testo(widget.evento?['titolo']));
-    descrizione = TextEditingController(
-      text: _testo(widget.evento?['descrizione']),
-    );
-    luogo = TextEditingController(text: _testo(widget.evento?['luogo']));
-    locandina = TextEditingController(
-      text: _testo(widget.evento?['locandina_url']),
-    );
-    data = DateTime.tryParse(_testo(widget.evento?['data_evento']));
-    anno = _testo(widget.evento?['anno_accademico']);
-    if (anno!.isEmpty) {
-      anno = widget.anniAccademici.isEmpty ? null : widget.anniAccademici.first;
-    }
-    iscrizioniAperte = widget.evento?['iscrizioni_aperte'] == true;
-  }
-
-  @override
-  void dispose() {
-    titolo.dispose();
-    descrizione.dispose();
-    luogo.dispose();
-    locandina.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.evento == null ? 'Nuovo evento' : 'Modifica evento'),
-    content: SizedBox(
-      width: 620,
-      child: Form(
-        key: form,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextFormField(
-                controller: titolo,
-                decoration: const InputDecoration(labelText: 'Titolo'),
-                validator: _obbligatorio,
-              ),
-              DropdownButtonFormField<String>(
-                initialValue: anno,
-                decoration: const InputDecoration(labelText: 'Anno accademico'),
-                items: widget.anniAccademici
-                    .map(
-                      (valore) =>
-                          DropdownMenuItem(value: valore, child: Text(valore)),
-                    )
-                    .toList(),
-                onChanged: (valore) => anno = valore,
-                validator: (valore) => valore == null ? 'Obbligatorio' : null,
-              ),
-              TextFormField(
-                controller: descrizione,
-                decoration: const InputDecoration(labelText: 'Descrizione'),
-                maxLines: 4,
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(data == null ? 'Data da definire' : _data(data)),
-                trailing: Wrap(
-                  children: [
-                    if (data != null)
-                      IconButton(
-                        tooltip: 'Rimuovi data',
-                        onPressed: () => setState(() => data = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Scegli data',
-                      onPressed: _scegliData,
-                      icon: const Icon(Icons.calendar_month_outlined),
-                    ),
-                  ],
-                ),
-              ),
-              TextFormField(
-                controller: luogo,
-                decoration: const InputDecoration(
-                  labelText: 'Luogo (facoltativo)',
-                ),
-              ),
-              TextFormField(
-                controller: locandina,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'URL pubblico della locandina',
-                ),
-                validator: (valore) {
-                  final testo = valore?.trim() ?? '';
-                  if (testo.isEmpty) {
-                    return null;
-                  }
-                  final uri = Uri.tryParse(testo);
-                  return uri != null &&
-                          (uri.scheme == 'http' || uri.scheme == 'https')
-                      ? null
-                      : 'Inserisci un URL http o https';
-                },
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Iscrizioni aperte'),
-                value: iscrizioniAperte,
-                onChanged: (valore) =>
-                    setState(() => iscrizioniAperte = valore),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Annulla'),
-      ),
-      FilledButton(onPressed: _salva, child: const Text('Salva')),
-    ],
-  );
-
-  Future<void> _scegliData() async {
-    final scelta = await showDatePicker(
-      context: context,
-      initialDate: data ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (scelta != null) {
-      setState(() => data = scelta);
-    }
-  }
-
-  void _salva() {
-    if (!(form.currentState?.validate() ?? false)) {
-      return;
-    }
-    Navigator.pop(context, <String, dynamic>{
-      'titolo': titolo.text.trim(),
-      'descrizione': _nullSeVuoto(descrizione.text),
-      'anno_accademico': anno,
-      'data_evento': data?.toIso8601String().split('T').first,
-      'luogo': _nullSeVuoto(luogo.text),
-      'locandina_url': _nullSeVuoto(locandina.text),
-      'iscrizioni_aperte': iscrizioniAperte,
-    });
-  }
-}
-
-class _OpzioneEditor extends StatefulWidget {
-  const _OpzioneEditor({this.opzione});
-
-  final Map<String, dynamic>? opzione;
-
-  @override
-  State<_OpzioneEditor> createState() => _OpzioneEditorState();
-}
-
-class _OpzioneEditorState extends State<_OpzioneEditor> {
-  final form = GlobalKey<FormState>();
-  late final TextEditingController descrizione;
-  late final TextEditingController ordine;
-
-  @override
-  void initState() {
-    super.initState();
-    descrizione = TextEditingController(
-      text: _testo(widget.opzione?['descrizione']),
-    );
-    ordine = TextEditingController(
-      text: _testo(widget.opzione?['ordine_visualizzazione']).isEmpty
-          ? '0'
-          : _testo(widget.opzione?['ordine_visualizzazione']),
-    );
-  }
-
-  @override
-  void dispose() {
-    descrizione.dispose();
-    ordine.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.opzione == null ? 'Nuova alternativa' : 'Modifica alternativa',
-    ),
-    content: SizedBox(
-      width: 500,
-      child: Form(
-        key: form,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: descrizione,
-              decoration: const InputDecoration(
-                labelText: 'Descrizione',
-                hintText: 'Esempio: Aperitivo 20 €',
-              ),
-              validator: _obbligatorio,
-            ),
-            TextFormField(
-              controller: ordine,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Ordine di visualizzazione',
-              ),
-              validator: (valore) => int.tryParse(valore ?? '') == null
-                  ? 'Inserisci un numero intero'
-                  : null,
-            ),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Annulla'),
-      ),
-      FilledButton(
-        onPressed: () {
-          if (!(form.currentState?.validate() ?? false)) {
-            return;
-          }
-          Navigator.pop(context, <String, dynamic>{
-            'descrizione': descrizione.text.trim(),
-            'ordine_visualizzazione': int.parse(ordine.text),
-          });
-        },
-        child: const Text('Salva'),
-      ),
-    ],
-  );
-}
-
-String? _obbligatorio(String? valore) =>
-    valore == null || valore.trim().isEmpty ? 'Campo obbligatorio' : null;
-
-String? _nullSeVuoto(String valore) =>
-    valore.trim().isEmpty ? null : valore.trim();
-
 String _testo(Object? valore) => valore?.toString().trim() ?? '';
 
 String _data(Object? valore) {
   final data = valore is DateTime ? valore : DateTime.tryParse(_testo(valore));
-  if (data == null) {
-    return '—';
-  }
+  if (data == null) return '—';
   return '${data.day.toString().padLeft(2, '0')}/'
       '${data.month.toString().padLeft(2, '0')}/${data.year}';
 }

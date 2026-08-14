@@ -1,15 +1,38 @@
 import 'package:flutter/material.dart';
 
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../sessione_controller.dart';
+import '../template/pagina_scheda_dinamica.dart';
 import 'mentee_controller.dart';
 
 class MenteePage extends StatefulWidget {
-  const MenteePage({super.key});
+  const MenteePage({super.key, required this.sessione});
+
+  final SessioneController sessione;
 
   @override
   State<MenteePage> createState() => _MenteePageState();
 }
 
 class _MenteePageState extends State<MenteePage> {
+  /// PERSONALIZZAZIONE MENTEE:
+  /// i tipi dei campi mentoraggio sono condivisi a livello di tabella; qui
+  /// resta solo il vincolo specifico del partecipante.
+  static const configurazione = ConfigurazionePaginaDinamica(
+    tabella: 'mentoraggi',
+    campi: <String, PersonalizzazioneCampo>{
+      'osservazioni_aula': PersonalizzazioneCampo(
+        modificabilePartecipante: false,
+      ),
+      'osservazioni_focus_group': PersonalizzazioneCampo(
+        modificabilePartecipante: false,
+      ),
+      'scheda_sintesi': PersonalizzazioneCampo(
+        modificabilePartecipante: false,
+      ),
+    },
+  );
+
   late final MenteeController controller;
 
   @override
@@ -28,63 +51,49 @@ class _MenteePageState extends State<MenteePage> {
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
     builder: (context, _) {
-      if (controller.caricamento) {
-        return const Center(child: CircularProgressIndicator());
-      }
-      if (controller.errore != null) {
-        return Center(child: Text(controller.errore!));
-      }
-      if (controller.insegnamento == null) {
-        return const Center(
-          child: Text('Nessun insegnamento per l’anno corrente.'),
-        );
-      }
-      if (controller.mentoraggio == null) {
-        return const Center(child: Text('Mentoraggio non ancora disponibile.'));
-      }
-      return ListView(
-        padding: const EdgeInsets.all(20),
-        children: <Widget>[
-          Text(
-            'Ruolo mentee',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: ListTile(
-              title: Text(
-                controller.insegnamento!['insegnamento']?.toString() ?? '',
-              ),
-              subtitle: Text(
-                controller.insegnamento!['anno_accademico']?.toString() ?? '',
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Team di mentoraggio',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          ...controller.mentori.map(
-            (m) => ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text('${m['nome'] ?? ''} ${m['cognome'] ?? ''}'.trim()),
-              subtitle: Text('${m['tipo'] ?? ''} · ${m['email_unipa'] ?? ''}'),
-            ),
-          ),
-          const Divider(height: 28),
-          ...controller.mentoraggio!.entries
-              .where((e) => !<String>{'id', 'insegnamento_id'}.contains(e.key))
-              .map(
-                (e) => ListTile(
+      final mentoraggio = controller.mentoraggio;
+      final messaggioVuoto = controller.insegnamento == null
+          ? 'Nessun insegnamento per l’anno corrente.'
+          : 'Mentoraggio non ancora disponibile.';
+      return PaginaSchedaDinamica(
+        titolo: 'Ruolo mentee',
+        configurazione: configurazione,
+        valori: mentoraggio,
+        partecipante: widget.sessione.ruolo == AppRole.participant,
+        caricamento: controller.caricamento,
+        errore: controller.errore,
+        vuoto: mentoraggio == null,
+        messaggioVuoto: messaggioVuoto,
+        primaDeiCampi: mentoraggio == null
+            ? const <Widget>[]
+            : <Widget>[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
                   title: Text(
-                    e.key.replaceAll('_', ' '),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    controller.insegnamento!['insegnamento']?.toString() ?? '',
                   ),
-                  subtitle: Text(e.value?.toString() ?? '—'),
+                  subtitle: Text(
+                    controller.insegnamento!['anno_accademico']?.toString() ?? '',
+                  ),
                 ),
-              ),
-        ],
+                const Divider(height: 28),
+                Text(
+                  'Team di mentoraggio',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                ...controller.mentori.map(
+                  (mentore) => ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: Text(
+                      '${mentore['nome'] ?? ''} ${mentore['cognome'] ?? ''}'.trim(),
+                    ),
+                    subtitle: Text(
+                      '${mentore['tipo'] ?? ''} · ${mentore['email_unipa'] ?? ''}',
+                    ),
+                  ),
+                ),
+                const Divider(height: 28),
+              ],
       );
     },
   );

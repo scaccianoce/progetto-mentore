@@ -1,16 +1,43 @@
 import 'package:flutter/material.dart';
 
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../sessione_controller.dart';
+import '../template/componenti_pagina_dinamica.dart';
+import '../template/template_elenco_dettaglio_page.dart';
 import 'contatti_controller.dart';
 
 class ContattiPage extends StatefulWidget {
-  const ContattiPage({super.key});
+  const ContattiPage({super.key, required this.sessione});
+
+  final SessioneController sessione;
 
   @override
   State<ContattiPage> createState() => _ContattiPageState();
 }
 
 class _ContattiPageState extends State<ContattiPage> {
+  /// PERSONALIZZAZIONE CONTATTI - tabella di riferimento: Anagrafica.
+  ///
+  /// La pagina e di sola consultazione, quindi non servono vincoli di modifica.
+  /// Si dichiarano solo i campi da non mostrare nel dettaglio e le etichette
+  /// che non possono essere dedotte correttamente dal nome della colonna.
+  static const configurazione = ConfigurazionePaginaDinamica(
+    tabella: 'anagrafica',
+    campi: <String, PersonalizzazioneCampo>{
+      'user_id': PersonalizzazioneCampo(nascosto: true),
+      'nome': PersonalizzazioneCampo(nascosto: true),
+      'cognome': PersonalizzazioneCampo(nascosto: true),
+      'email_unipa': PersonalizzazioneCampo(etichetta: 'Email'),
+      'cod_ssd': PersonalizzazioneCampo(etichetta: 'SSD'),
+      'pagina_personale_unipa': PersonalizzazioneCampo(
+        etichetta: 'Pagina personale',
+      ),
+    },
+  );
+
   late final ContattiController _controller;
+
+  bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
 
   @override
   void initState() {
@@ -25,127 +52,56 @@ class _ContattiPageState extends State<ContattiPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (BuildContext context, Widget? child) {
-        return Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: <Widget>[
-              TextField(
-                onChanged: _controller.cerca,
-                decoration: const InputDecoration(
-                  labelText: 'Cerca per nome, email o SSD',
-                  prefixIcon: Icon(Icons.search),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(child: _contenuto()),
-            ],
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _controller,
+    builder: (context, _) {
+      final selezionato = _controller.selezionato;
+      return TemplatePaginaElencoDettaglio(
+        caricamento: _controller.caricamento && _controller.contatti.isEmpty,
+        errore: _controller.errore,
+        vuoto: _controller.contatti.isEmpty,
+        messaggioVuoto: 'Nessun contatto disponibile.',
+        intestazione: TextField(
+          onChanged: _controller.cerca,
+          decoration: const InputDecoration(
+            labelText: 'Cerca per nome, email o SSD',
+            prefixIcon: Icon(Icons.search),
+            border: OutlineInputBorder(),
           ),
-        );
-      },
-    );
-  }
-
-  Widget _contenuto() {
-    if (_controller.caricamento && _controller.contatti.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_controller.errore != null && _controller.contatti.isEmpty) {
-      return Center(child: Text(_controller.errore!));
-    }
-
-    final Widget elenco = Card(
-      margin: EdgeInsets.zero,
-      child: ListView.builder(
-        itemCount: _controller.contatti.length,
-        itemBuilder: (BuildContext context, int index) {
-          final Map<String, dynamic> contatto = _controller.contatti[index];
-          final String nome =
-              '${contatto['cognome'] ?? ''} ${contatto['nome'] ?? ''}'.trim();
-          return ListTile(
-            selected:
-                contatto['user_id'] == _controller.selezionato?['user_id'],
-            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-            title: Text(nome),
-            subtitle: Text(contatto['email_unipa']?.toString() ?? ''),
-            onTap: () => _controller.seleziona(contatto),
-          );
-        },
-      ),
-    );
-    final Widget dettaglio = _DettaglioContatto(
-      contatto: _controller.selezionato,
-    );
-
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        if (constraints.maxWidth >= 800) {
-          return Row(
-            children: <Widget>[
-              SizedBox(width: 360, child: elenco),
-              const VerticalDivider(width: 24),
-              Expanded(child: dettaglio),
-            ],
-          );
-        }
-        return Column(
-          children: <Widget>[
-            Expanded(child: elenco),
-            const Divider(height: 20),
-            Expanded(child: dettaglio),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _DettaglioContatto extends StatelessWidget {
-  const _DettaglioContatto({required this.contatto});
-
-  final Map<String, dynamic>? contatto;
-
-  static const Map<String, String> etichette = <String, String>{
-    'email_unipa': 'Email',
-    'cellulare': 'Cellulare',
-    'cod_ssd': 'SSD',
-    'ruolo_accademico': 'Ruolo accademico',
-    'dipartimento': 'Dipartimento',
-    'ufficio': 'Ufficio',
-    'pagina_personale_unipa': 'Pagina personale',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final Map<String, dynamic>? dato = contatto;
-    if (dato == null) {
-      return const Center(child: Text('Seleziona un contatto.'));
-    }
-    final String nome = '${dato['nome'] ?? ''} ${dato['cognome'] ?? ''}'.trim();
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: <Widget>[
-          Text(nome, style: Theme.of(context).textTheme.headlineSmall),
-          const Divider(height: 28),
-          ...etichette.entries.map((e) {
-            final String valore = dato[e.key]?.toString().trim() ?? '';
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                e.value,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: SelectableText(valore.isEmpty ? '—' : valore),
-            );
-          }),
-        ],
-      ),
-    );
-  }
+        ),
+        elenco: ElencoRecordDinamico<Map<String, dynamic>>(
+          elementi: _controller.contatti,
+          idSelezionato: selezionato?['user_id']?.toString(),
+          id: (contatto) => contatto['user_id']?.toString() ?? '',
+          titolo: (contatto) =>
+              '${contatto['cognome'] ?? ''} ${contatto['nome'] ?? ''}'.trim(),
+          sottotitolo: (contatto) =>
+              contatto['email_unipa']?.toString() ?? '',
+          leading: (_) => const CircleAvatar(
+            child: Icon(Icons.person_outline),
+          ),
+          onSeleziona: _controller.seleziona,
+        ),
+        dettaglio: Card(
+          margin: EdgeInsets.zero,
+          child: selezionato == null
+              ? const Center(child: Text('Seleziona un contatto.'))
+              : DettaglioRecordDinamico(
+                  configurazione: configurazione,
+                  valori: selezionato,
+                  partecipante: _partecipante,
+                  padding: const EdgeInsets.all(24),
+                  prima: <Widget>[
+                    Text(
+                      '${selezionato['nome'] ?? ''} ${selezionato['cognome'] ?? ''}'
+                          .trim(),
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const Divider(height: 28),
+                  ],
+                ),
+        ),
+      );
+    },
+  );
 }

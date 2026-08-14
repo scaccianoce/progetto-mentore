@@ -48,7 +48,9 @@ class _MentoreAppState extends State<MentoreApp> {
         title: 'Progetto Mentore per la Didattica',
         debugShowCheckedModeBanner: false,
         theme: tema,
-        home: _PaginaErroreAvvio(messaggio: widget.erroreAvvio!),
+        home: SelectionArea(
+          child: _PaginaErroreAvvio(messaggio: widget.erroreAvvio!),
+        ),
       );
     }
     return MaterialApp.router(

@@ -9,10 +9,6 @@ class ProfiloController extends ChangeNotifier {
   ProfiloController({required this.sessione, SupabaseClient? client})
     : _client = client ?? SupabaseConfig.client;
 
-  static const String colonne =
-      'user_id, email_unipa, cognome, nome, cod_ssd, dipartimento, '
-      'ufficio, ruolo_accademico, cellulare, fascia_eta, '
-      'pagina_personale_unipa, anno_prima_partecipazione, created_at';
 
   final SessioneController sessione;
   final SupabaseClient _client;
@@ -49,7 +45,7 @@ class ProfiloController extends ChangeNotifier {
       final risultati = await Future.wait<dynamic>([
         _client
             .from('anagrafica')
-            .select(colonne)
+            .select()
             .eq('user_id', utente.id)
             .maybeSingle(),
         _client.from('ssd').select('cod_ssd, gsd, area').order('cod_ssd'),
@@ -74,12 +70,17 @@ class ProfiloController extends ChangeNotifier {
         ..addAll(
           (risultati[2] as List)
               .cast<Map<String, dynamic>>()
-              .map((riga) => riga['codice'].toString().split('-').first)
+              // CORREZIONE: manteniamo il codice completo dell'anno accademico
+              // (es. 2014-15) invece di mostrare soltanto l'anno iniziale.
+              .map((riga) => riga['codice'].toString())
               .toSet(),
         );
       final annoProfilo = _profilo?['anno_prima_partecipazione']
           ?.toString()
           .trim();
+      // `anno_prima_partecipazione` e una FK verso anni_accademici.codice:
+      // il valore applicativo e quindi il codice completo (es. 2014-15).
+      // Nessuna conversione o troncamento dell'anno nel frontend.
       if (annoProfilo != null &&
           annoProfilo.isNotEmpty &&
           !_anniAccademici.contains(annoProfilo)) {
@@ -136,11 +137,31 @@ class ProfiloController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final schema = await SupabaseConfig.caricaSchemaDatabase();
+      final tabella = schema.tabella('anagrafica');
+      final valoriDatabase = <String, dynamic>{};
+      for (final voce in valori.entries) {
+        // Non reinviamo tutto il record: soltanto valori realmente cambiati e
+        // colonne scrivibili. Questo evita errori causati da campi tecnici o
+        // readonly presenti nella maschera solo per visualizzazione.
+        if (_profilo?[voce.key] == voce.value) continue;
+        final campo = tabella?.campo(voce.key);
+        if (campo != null &&
+            (campo.chiavePrimaria || campo.identita || campo.generato || campo.solaLettura)) {
+          continue;
+        }
+        valoriDatabase[voce.key] = voce.value;
+      }
+
+      // `anno_prima_partecipazione` viene salvato esattamente come selezionato
+      // (es. "2014-15"), coerentemente con la FK verso anni_accademici.codice.
+      if (valoriDatabase.isEmpty) return;
+
       final Map<String, dynamic>? aggiornata = await _client
           .from('anagrafica')
-          .update(valori)
+          .update(valoriDatabase)
           .eq('user_id', userId)
-          .select(colonne)
+          .select()
           .maybeSingle();
       if (aggiornata == null) {
         throw const AppException('Salvataggio del profilo non riuscito.');

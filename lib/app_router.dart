@@ -3,7 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import 'menu_controller.dart';
 import 'menu_page.dart';
-import 'pagine/amministrazione/amministrazione_page.dart';
+import 'pagine/backoffice/anni_accademici_backoffice_page.dart';
+import 'pagine/backoffice/backoffice_controller_host.dart';
+import 'pagine/backoffice/controllo_partecipanti_backoffice_page.dart';
+import 'pagine/backoffice/database_backoffice_page.dart';
+import 'pagine/backoffice/notifiche_backoffice_page.dart';
+import 'pagine/backoffice/partecipanti_backoffice_page.dart';
 import 'pagine/contatti/contatti_page.dart';
 import 'pagine/eventi/eventi_page.dart';
 import 'pagine/house_of_mentore/house_of_mentore_page.dart';
@@ -34,11 +39,14 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
   routes: <RouteBase>[
     GoRoute(
       path: '/login',
-      builder: (context, state) => LoginPage(sessione: sessione),
+      builder: (context, state) => SelectionArea(
+        child: LoginPage(sessione: sessione),
+      ),
     ),
     ShellRoute(
-      builder: (context, state, child) =>
-          MenuPage(sessione: sessione, contenuto: child),
+      builder: (context, state, child) => SelectionArea(
+        child: MenuPage(sessione: sessione, contenuto: child),
+      ),
       routes: <RouteBase>[
         GoRoute(path: '/', redirect: (_, _) => '/news'),
         GoRoute(
@@ -53,8 +61,14 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
           path: '/insegnamento',
           builder: (_, _) => InsegnamentoPage(sessione: sessione),
         ),
-        GoRoute(path: '/mentee', builder: (_, _) => const MenteePage()),
-        GoRoute(path: '/mentore', builder: (_, _) => const MentorePage()),
+        GoRoute(
+          path: '/mentee',
+          builder: (_, _) => MenteePage(sessione: sessione),
+        ),
+        GoRoute(
+          path: '/mentore',
+          builder: (_, _) => MentorePage(sessione: sessione),
+        ),
         GoRoute(
           path: '/eventi',
           builder: (_, _) => EventiPage(sessione: sessione),
@@ -63,15 +77,44 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
           path: '/house-of-mentore',
           builder: (_, _) => HouseOfMentorePage(sessione: sessione),
         ),
-        GoRoute(path: '/contatti', builder: (_, _) => const ContattiPage()),
         GoRoute(
-          path: '/amministrazione',
-          builder: (_, _) => AmministrazionePage(sessione: sessione),
+          path: '/contatti',
+          builder: (_, _) => ContattiPage(sessione: sessione),
+        ),
+        GoRoute(
+          path: '/gestione/database',
+          builder: (_, _) => DatabaseBackofficePage(sessione: sessione),
+        ),
+        GoRoute(
+          path: '/gestione/partecipanti',
+          builder: (_, _) => BackofficeControllerHost(
+            sessione: sessione,
+            builder: (_, controller) =>
+                PartecipantiBackofficePage(controller: controller),
+          ),
+        ),
+        GoRoute(
+          path: '/gestione/anni-accademici',
+          builder: (_, _) => BackofficeControllerHost(
+            sessione: sessione,
+            builder: (_, controller) =>
+                AnniAccademiciBackofficePage(controller: controller),
+          ),
+        ),
+        GoRoute(
+          path: '/gestione/controllo-partecipanti',
+          builder: (_, _) => const ControlloPartecipantiBackofficePage(),
+        ),
+        GoRoute(
+          path: '/gestione/notifiche',
+          builder: (_, _) => const NotificheBackofficePage(),
         ),
       ],
     ),
   ],
-  errorBuilder: (context, state) => Scaffold(
-    body: Center(child: Text('Pagina non trovata: ${state.uri.path}')),
+  errorBuilder: (context, state) => SelectionArea(
+    child: Scaffold(
+      body: Center(child: Text('Pagina non trovata: ${state.uri.path}')),
+    ),
   ),
 );

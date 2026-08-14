@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app_branding.dart';
 import '../../sessione_controller.dart';
 import 'login_controller.dart';
 
@@ -48,10 +49,10 @@ class _LoginPageState extends State<LoginPage> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          Icon(
-                            Icons.school_outlined,
-                            size: 54,
-                            color: Theme.of(context).colorScheme.primary,
+                          Image.asset(
+                            AppBranding.logoAsset,
+                            height: 64,
+                            fit: BoxFit.contain,
                           ),
                           const SizedBox(height: 16),
                           Text(

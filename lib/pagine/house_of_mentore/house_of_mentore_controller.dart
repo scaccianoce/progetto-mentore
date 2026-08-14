@@ -13,6 +13,12 @@ class HouseOfMentoreController extends ChangeNotifier {
   final iscrizioni = <String, Map<String, dynamic>>{};
   final anniAccademici = <String>[];
 
+  /// Iscritti visibili solo a owner/organizer, raggruppati per iniziativa.
+  final Map<String, List<Map<String, dynamic>>> iscrittiPerEvento =
+      <String, List<Map<String, dynamic>>>{};
+  final Map<String, Map<String, dynamic>> anagraficaPerUserId =
+      <String, Map<String, dynamic>>{};
+
   bool caricamento = false;
   String? errore;
   String? eventoSelezionatoId;
@@ -32,6 +38,29 @@ class HouseOfMentoreController extends ChangeNotifier {
       opzioniPerEvento[eventoId] ?? const <Map<String, dynamic>>[];
 
   Map<String, dynamic>? iscrizione(String eventoId) => iscrizioni[eventoId];
+
+  List<Map<String, dynamic>> iscritti(String eventoId) =>
+      iscrittiPerEvento[eventoId] ?? const <Map<String, dynamic>>[];
+
+  String nomePartecipante(String userId) {
+    final persona = anagraficaPerUserId[userId];
+    if (persona == null) return userId;
+    final cognome = persona['cognome']?.toString().trim() ?? '';
+    final nome = persona['nome']?.toString().trim() ?? '';
+    final completo = '$cognome $nome'.trim();
+    return completo.isEmpty ? userId : completo;
+  }
+
+  String descrizioneOpzione(String eventoId, Object? opzioneId) {
+    final id = opzioneId?.toString() ?? '';
+    if (id.isEmpty) return '—';
+    for (final opzione in opzioni(eventoId)) {
+      if (opzione['id']?.toString() == id) {
+        return opzione['descrizione']?.toString().trim() ?? '—';
+      }
+    }
+    return id;
+  }
 
   Future<void> carica() async {
     caricamento = true;
@@ -91,6 +120,31 @@ class HouseOfMentoreController extends ChangeNotifier {
           ),
         );
 
+      iscrittiPerEvento.clear();
+      anagraficaPerUserId.clear();
+      if (puoGestire) {
+        final risultatiGestione = await Future.wait<dynamic>(<Future<dynamic>>[
+          db
+              .from('partecipazioni_house_of_mentore')
+              .select(
+                'evento_id, partecipante_id, opzione_id, data_iscrizione, presente',
+              )
+              .order('data_iscrizione', ascending: true),
+          db.from('anagrafica').select('user_id, nome, cognome'),
+        ]);
+        for (final riga
+            in (risultatiGestione[0] as List).cast<Map<String, dynamic>>()) {
+          final eventoId = riga['evento_id']?.toString() ?? '';
+          if (eventoId.isEmpty) continue;
+          iscrittiPerEvento.putIfAbsent(eventoId, () => <Map<String, dynamic>>[]).add(riga);
+        }
+        for (final persona
+            in (risultatiGestione[1] as List).cast<Map<String, dynamic>>()) {
+          final id = persona['user_id']?.toString() ?? '';
+          if (id.isNotEmpty) anagraficaPerUserId[id] = persona;
+        }
+      }
+
       if (eventi.isNotEmpty &&
           !eventi.any(
             (evento) => evento['id'].toString() == eventoSelezionatoId,
@@ -112,6 +166,23 @@ class HouseOfMentoreController extends ChangeNotifier {
     eventoSelezionatoId = evento['id'].toString();
     notifyListeners();
   }
+
+
+  Future<String?> aggiornaPresenza({
+    required String eventoId,
+    required String partecipanteId,
+    required bool presente,
+  }) => _esegui(
+    azione: () async {
+      _verificaGestore();
+      await SupabaseConfig.client
+          .from('partecipazioni_house_of_mentore')
+          .update(<String, dynamic>{'presente': presente})
+          .eq('evento_id', eventoId)
+          .eq('partecipante_id', partecipanteId);
+    },
+    messaggio: 'Impossibile aggiornare la presenza.',
+  );
 
   Future<String?> salvaEvento({
     String? id,

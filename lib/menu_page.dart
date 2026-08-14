@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'app_branding.dart';
 import 'menu_controller.dart';
 import 'sessione_controller.dart';
 
@@ -96,10 +97,13 @@ class _PannelloMenu extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
             child: Row(
               children: <Widget>[
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  child: const Icon(Icons.school_outlined),
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Image.asset(
+                    AppBranding.logoAsset,
+                    fit: BoxFit.contain,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 const Expanded(

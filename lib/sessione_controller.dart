@@ -143,6 +143,7 @@ class SessioneController extends ChangeNotifier {
       }
 
       _ruolo = AppRole.daDatabase(riga['role']);
+      unawaited(_precaricaSchemaDatabase());
     } catch (errore) {
       if (versione != _versioneCaricamento) {
         return;
@@ -165,6 +166,15 @@ class SessioneController extends ChangeNotifier {
     }
     _caricamento = valore;
     notifyListeners();
+  }
+
+  Future<void> _precaricaSchemaDatabase() async {
+    try {
+      await SupabaseConfig.caricaSchemaDatabase();
+    } catch (_) {
+      // Le pagine mantengono il fallback locale se i metadati non sono
+      // temporaneamente disponibili; l'accesso dell'utente non viene bloccato.
+    }
   }
 
   @override

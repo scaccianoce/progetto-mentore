@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../template/componenti_pagina_dinamica.dart';
+import '../template/template_elenco_dettaglio_page.dart';
 import 'eventi_controller.dart';
 
 class EventiPage extends StatefulWidget {
@@ -15,6 +19,72 @@ class EventiPage extends StatefulWidget {
 class _EventiPageState extends State<EventiPage> {
   late final EventiController controller;
 
+  bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
+
+  /// PERSONALIZZAZIONE EVENTI: solo tipi, scelte e vincoli speciali.
+  ConfigurazionePaginaDinamica get _configurazione =>
+      ConfigurazionePaginaDinamica(
+        tabella: 'eventi',
+        campi: <String, PersonalizzazioneCampo>{
+          'titolo': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          'anno_accademico': PersonalizzazioneCampo(
+            tipo: TipoCampoDinamico.scelta,
+            valoriScelta: controller.anniAccademici,
+            modificabilePartecipante: false,
+          ),
+          'data_evento': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          'tipologia': const PersonalizzazioneCampo(
+            // Opzioni lette dal PostgreSQL ENUM del DB.
+            modificabilePartecipante: false,
+          ),
+          'modalita': const PersonalizzazioneCampo(
+            // Opzioni lette dal PostgreSQL ENUM del DB.
+            modificabilePartecipante: false,
+          ),
+          'descrizione': const PersonalizzazioneCampo(
+            tipo: TipoCampoDinamico.testoFormattato,
+            modificabilePartecipante: false,
+          ),
+          'relatori': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          'moderatori': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          'note_organizzative': const PersonalizzazioneCampo(
+            modificabilePartecipante: false,
+          ),
+          for (final campo in <String>[
+            'luogo',
+            'locandina_path',
+            'modulo_partecipazione_url',
+            'data_apertura_iscrizioni',
+            'data_chiusura_iscrizioni',
+          ])
+            campo: const PersonalizzazioneCampo(
+              modificabilePartecipante: false,
+            ),
+          'attiva': PersonalizzazioneCampo(
+            // Nascosto ai partecipanti; owner/organizer possono decidere
+            // direttamente se l'evento e pubblicato.
+            nascosto: _partecipante,
+            modificabilePartecipante: false,
+          ),
+          'questionario_gradimento_attivo': const PersonalizzazioneCampo(
+            visibilePartecipante: false,
+            modificabilePartecipante: false,
+          ),
+          'link_questionario_gradimento': const PersonalizzazioneCampo(
+            visibilePartecipante: false,
+            modificabilePartecipante: false,
+          ),
+        },
+      );
+
   @override
   void initState() {
     super.initState();
@@ -28,189 +98,216 @@ class _EventiPageState extends State<EventiPage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Eventi',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                IconButton(
-                  onPressed: controller.carica,
-                  icon: const Icon(Icons.refresh),
-                ),
-                if (controller.puoGestire)
-                  FilledButton.icon(
-                    onPressed: () => _apriEditor(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Nuovo'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Expanded(child: _corpo()),
-          ],
-        ),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) => TemplatePaginaElencoDettaglio(
+      caricamento: controller.caricamento && controller.eventi.isEmpty,
+      errore: controller.errore,
+      vuoto: controller.eventi.isEmpty,
+      messaggioVuoto: 'Nessun evento disponibile.',
+      larghezzaElenco: 340,
+      intestazione: IntestazionePaginaDinamica(
+        titolo: 'Eventi',
+        onAggiorna: controller.carica,
+        onNuovo: controller.puoGestire ? () => _apriEditor() : null,
       ),
-    );
-  }
-
-  Widget _corpo() {
-    if (controller.caricamento && controller.eventi.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (controller.errore != null && controller.eventi.isEmpty) {
-      return Center(child: Text(controller.errore!));
-    }
-    if (controller.eventi.isEmpty) {
-      return const Center(child: Text('Nessun evento disponibile.'));
-    }
-    final elenco = _elenco();
-    final dettaglio = _dettaglio(controller.eventoSelezionato!);
-    return LayoutBuilder(
-      builder: (context, vincoli) {
-        if (vincoli.maxWidth >= 850) {
-          return Row(
-            children: [
-              SizedBox(width: 340, child: elenco),
-              const VerticalDivider(width: 1),
-              Expanded(child: dettaglio),
-            ],
-          );
-        }
-        return Column(
-          children: [
-            SizedBox(height: 230, child: elenco),
-            const Divider(height: 1),
-            Expanded(child: dettaglio),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _elenco() => ListView.builder(
-    itemCount: controller.eventi.length,
-    itemBuilder: (context, indice) {
-      final evento = controller.eventi[indice];
-      final id = evento['id'].toString();
-      return ListTile(
-        selected: id == controller.eventoSelezionatoId,
-        title: Text(
-          evento['titolo']?.toString() ?? '',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(_data(evento['data_evento'])),
-        trailing: controller.iscritto(id)
+      elenco: ElencoRecordDinamico<Map<String, dynamic>>(
+        elementi: controller.eventi,
+        idSelezionato: controller.eventoSelezionatoId,
+        id: (evento) => evento['id'].toString(),
+        titolo: (evento) => evento['titolo']?.toString() ?? '',
+        sottotitolo: (evento) => _data(evento['data_evento']),
+        trailing: (evento) => controller.iscritto(evento['id'].toString())
             ? const Icon(Icons.check_circle, color: Colors.green)
             : null,
-        onTap: () => controller.seleziona(evento),
-      );
-    },
+        onSeleziona: controller.seleziona,
+      ),
+      dettaglio: controller.eventoSelezionato == null
+          ? const Center(child: Text('Seleziona un evento.'))
+          : Card(
+              margin: EdgeInsets.zero,
+              child: _dettaglio(controller.eventoSelezionato!),
+            ),
+    ),
   );
 
   Widget _dettaglio(Map<String, dynamic> evento) {
     final id = evento['id'].toString();
     final iscritto = controller.iscritto(id);
     final aperte = controller.iscrizioniAperte(evento);
-    return SingleChildScrollView(
+    return ListView(
       padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            evento['titolo']?.toString() ?? '',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.blue.shade800,
-              fontWeight: FontWeight.bold,
-            ),
+      children: <Widget>[
+        CampiTabellaDinamici(
+          configurazione: _configurazione,
+          valori: evento,
+          partecipante: _partecipante,
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: aperte ? () => _cambiaIscrizione(evento) : null,
+          icon: Icon(iscritto ? Icons.event_busy : Icons.event_available),
+          label: Text(iscritto ? 'Annulla iscrizione' : 'Iscriviti'),
+        ),
+        if (!aperte)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Text('Le iscrizioni non sono aperte.'),
           ),
-          const SizedBox(height: 12),
-          _riga('Data', _data(evento['data_evento'])),
-          _riga('Anno accademico', evento['anno_accademico']),
-          _riga('Tipologia', evento['tipologia']),
-          _riga('Modalità', evento['modalita']),
-          _riga('Luogo', evento['luogo']),
-          _riga('Descrizione', evento['descrizione']),
-          _riga('Relatori', evento['relatori']),
-          _riga('Moderatori', evento['moderatori']),
-          _riga('Note organizzative', evento['note_organizzative']),
-          _riga('Locandina', evento['locandina_path']),
-          _riga(
-            'Modulo di partecipazione',
-            evento['modulo_partecipazione_url'],
-          ),
+        if (iscritto &&
+            evento['questionario_gradimento_attivo'] == true &&
+            _testo(evento['link_questionario_gradimento']).isNotEmpty) ...[
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: aperte ? () => _cambiaIscrizione(evento) : null,
-            icon: Icon(iscritto ? Icons.event_busy : Icons.event_available),
-            label: Text(iscritto ? 'Annulla iscrizione' : 'Iscriviti'),
+          const Text(
+            'Questionario di gradimento',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-          if (!aperte)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('Le iscrizioni non sono aperte.'),
-            ),
-          if (iscritto &&
-              evento['questionario_gradimento_attivo'] == true &&
-              _testo(evento['link_questionario_gradimento']).isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text(
-              'Questionario di gradimento',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SelectableText(
-              _testo(evento['link_questionario_gradimento']),
-              style: const TextStyle(color: Colors.blue),
-            ),
-          ],
-          if (controller.puoGestire) ...[
-            const Divider(height: 32),
-            Wrap(
-              spacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: () => _apriEditor(evento),
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Modifica'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _elimina(evento),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Elimina'),
-                ),
-              ],
-            ),
-          ],
+          SelectableText(_testo(evento['link_questionario_gradimento'])),
         ],
-      ),
+        if (controller.puoGestire) ...[
+          const Divider(height: 32),
+          _elencoIscrittiEvento(evento),
+          const Divider(height: 32),
+          Wrap(
+            spacing: 8,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: () => _apriEditor(evento),
+                icon: const Icon(Icons.edit),
+                label: const Text('Modifica'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _elimina(evento),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Elimina'),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 
-  Widget _riga(String etichetta, Object? valore) {
-    final testo = _testo(valore);
-    if (testo.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(
-              text: '$etichetta: ',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            TextSpan(text: testo),
-          ],
+  Widget _elencoIscrittiEvento(Map<String, dynamic> evento) {
+    final eventoId = evento['id'].toString();
+    final iscritti = controller.iscritti(eventoId);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Iscritti (${iscritti.length})',
+          style: Theme.of(context).textTheme.titleMedium,
         ),
-      ),
+        const SizedBox(height: 8),
+        if (iscritti.isEmpty)
+          const Text('Nessun partecipante iscritto.')
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const <DataColumn>[
+                DataColumn(label: Text('#'), numeric: true),
+                DataColumn(label: Text('Partecipante')),
+                DataColumn(label: Text('Presente')),
+                DataColumn(label: Text('Questionario compilato')),
+                DataColumn(label: Text('Data compilazione')),
+              ],
+              rows: <DataRow>[
+                for (var indice = 0; indice < iscritti.length; indice++)
+                  _rigaIscrittoEvento(
+                    eventoId: eventoId,
+                    indice: indice,
+                    partecipazione: iscritti[indice],
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  DataRow _rigaIscrittoEvento({
+    required String eventoId,
+    required int indice,
+    required Map<String, dynamic> partecipazione,
+  }) {
+    final partecipanteId = partecipazione['partecipante_id']?.toString() ?? '';
+    final presente = partecipazione['presente'] == true;
+    final questionario = partecipazione['questionario_compilato'] == true;
+    final dataCompilazione = DateTime.tryParse(
+      partecipazione['data_compilazione']?.toString() ?? '',
+    );
+
+    Future<void> salva({
+      bool? nuovoPresente,
+      bool? nuovoQuestionario,
+      DateTime? nuovaData,
+      bool modificaData = false,
+    }) async {
+      final errore = await controller.aggiornaPartecipazione(
+        eventoId: eventoId,
+        partecipanteId: partecipanteId,
+        presente: nuovoPresente ?? presente,
+        questionarioCompilato: nuovoQuestionario ?? questionario,
+        dataCompilazione: modificaData ? nuovaData : dataCompilazione,
+      );
+      if (!mounted || errore == null) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errore)),
+      );
+    }
+
+    return DataRow(
+      cells: <DataCell>[
+        DataCell(Text('${indice + 1}')),
+        DataCell(Text(controller.nomePartecipante(partecipanteId))),
+        DataCell(
+          Checkbox(
+            value: presente,
+            onChanged: (valore) {
+              if (valore != null) salva(nuovoPresente: valore);
+            },
+          ),
+        ),
+        DataCell(
+          Checkbox(
+            value: questionario,
+            onChanged: (valore) {
+              if (valore != null) salva(nuovoQuestionario: valore);
+            },
+          ),
+        ),
+        DataCell(
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(dataCompilazione == null ? '—' : _data(dataCompilazione)),
+              IconButton(
+                tooltip: 'Modifica data compilazione',
+                icon: const Icon(Icons.calendar_month_outlined),
+                onPressed: () async {
+                  final scelta = await showDatePicker(
+                    context: context,
+                    initialDate: dataCompilazione ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2200),
+                  );
+                  if (scelta != null) {
+                    await salva(nuovaData: scelta, modificaData: true);
+                  }
+                },
+              ),
+              if (dataCompilazione != null)
+                IconButton(
+                  tooltip: 'Cancella data compilazione',
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => salva(nuovaData: null, modificaData: true),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -224,9 +321,22 @@ class _EventiPageState extends State<EventiPage> {
   }
 
   Future<void> _apriEditor([Map<String, dynamic>? evento]) async {
-    final risultato = await showDialog<Map<String, dynamic>>(
+    final iniziali =
+        evento ??
+        <String, dynamic>{
+          'titolo': '',
+          'anno_accademico': controller.anniAccademici.isEmpty
+              ? null
+              : controller.anniAccademici.first,
+          'questionario_gradimento_attivo': false,
+          'attiva': true,
+        };
+    final risultato = await mostraMascheraDinamica(
       context: context,
-      builder: (_) => _EventoEditor(evento: evento),
+      configurazione: _configurazione,
+      valoriIniziali: iniziali,
+      partecipante: _partecipante,
+      titolo: evento == null ? 'Nuovo evento' : 'Modifica evento',
     );
     if (risultato == null) return;
     final errore = await controller.salva(
@@ -246,7 +356,7 @@ class _EventiPageState extends State<EventiPage> {
           context: context,
           builder: (_) => AlertDialog(
             title: const Text('Eliminare l’evento?'),
-            actions: [
+            actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
                 child: const Text('No'),
@@ -269,253 +379,11 @@ class _EventiPageState extends State<EventiPage> {
   }
 }
 
-class _EventoEditor extends StatefulWidget {
-  const _EventoEditor({this.evento});
-  final Map<String, dynamic>? evento;
-  @override
-  State<_EventoEditor> createState() => _EventoEditorState();
-}
-
-class _EventoEditorState extends State<_EventoEditor> {
-  final form = GlobalKey<FormState>();
-  final campi = <String, TextEditingController>{};
-  DateTime? dataEvento;
-  DateTime? aperturaIscrizioni;
-  DateTime? chiusuraIscrizioni;
-  String tipologia = 'Altro';
-  String modalita = 'In presenza';
-  bool questionario = false;
-
-  static const etichette = <String, String>{
-    'titolo': 'Titolo',
-    'anno_accademico': 'Anno accademico',
-    'data_evento': 'Data (AAAA-MM-GG)',
-    'luogo': 'Luogo',
-    'descrizione': 'Descrizione',
-    'relatori': 'Relatori',
-    'moderatori': 'Moderatori',
-    'note_organizzative': 'Note organizzative',
-    'locandina_path': 'Link/path locandina',
-    'modulo_partecipazione_url': 'Modulo di partecipazione',
-    'data_apertura_iscrizioni': 'Apertura iscrizioni (AAAA-MM-GG)',
-    'data_chiusura_iscrizioni': 'Chiusura iscrizioni (AAAA-MM-GG)',
-    'link_questionario_gradimento': 'Link questionario',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    for (final chiave in etichette.keys) {
-      campi[chiave] = TextEditingController(
-        text: _testo(widget.evento?[chiave]),
-      );
-    }
-    dataEvento = DateTime.tryParse(_testo(widget.evento?['data_evento']));
-    aperturaIscrizioni = DateTime.tryParse(
-      _testo(widget.evento?['data_apertura_iscrizioni']),
-    );
-    chiusuraIscrizioni = DateTime.tryParse(
-      _testo(widget.evento?['data_chiusura_iscrizioni']),
-    );
-    tipologia = _testo(widget.evento?['tipologia']).isEmpty
-        ? 'Altro'
-        : _testo(widget.evento?['tipologia']);
-    modalita = _testo(widget.evento?['modalita']).isEmpty
-        ? 'In presenza'
-        : _testo(widget.evento?['modalita']);
-    questionario = widget.evento?['questionario_gradimento_attivo'] == true;
-  }
-
-  @override
-  void dispose() {
-    for (final c in campi.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.evento == null ? 'Nuovo evento' : 'Modifica evento'),
-    content: SizedBox(
-      width: 620,
-      child: Form(
-        key: form,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              for (final voce in etichette.entries)
-                if (voce.key != 'data_evento' &&
-                    voce.key != 'data_apertura_iscrizioni' &&
-                    voce.key != 'data_chiusura_iscrizioni')
-                  TextFormField(
-                    controller: campi[voce.key],
-                    decoration: InputDecoration(labelText: voce.value),
-                    maxLines:
-                        const {
-                          'descrizione',
-                          'luogo',
-                          'note_organizzative',
-                        }.contains(voce.key)
-                        ? 3
-                        : 1,
-                    validator:
-                        voce.key == 'titolo' || voce.key == 'anno_accademico'
-                            ? (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Campo obbligatorio'
-                                  : null
-                            : null,
-                  ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  dataEvento == null
-                      ? etichette['data_evento']!
-                      : 'Data evento: ${_data(dataEvento)}',
-                ),
-                trailing: Wrap(
-                  children: [
-                    if (dataEvento != null)
-                      IconButton(
-                        tooltip: 'Rimuovi data evento',
-                        onPressed: () => setState(() => dataEvento = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Scegli data evento',
-                      onPressed: () => _scegliData((valore) {
-                        setState(() => dataEvento = valore);
-                      }, dataEvento),
-                      icon: const Icon(Icons.calendar_month_outlined),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  aperturaIscrizioni == null
-                      ? etichette['data_apertura_iscrizioni']!
-                      : 'Apertura iscrizioni: ${_data(aperturaIscrizioni)}',
-                ),
-                trailing: Wrap(
-                  children: [
-                    if (aperturaIscrizioni != null)
-                      IconButton(
-                        tooltip: 'Rimuovi apertura iscrizioni',
-                        onPressed: () => setState(() => aperturaIscrizioni = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Scegli apertura iscrizioni',
-                      onPressed: () => _scegliData((valore) {
-                        setState(() => aperturaIscrizioni = valore);
-                      }, aperturaIscrizioni),
-                      icon: const Icon(Icons.calendar_month_outlined),
-                    ),
-                  ],
-                ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  chiusuraIscrizioni == null
-                      ? etichette['data_chiusura_iscrizioni']!
-                      : 'Chiusura iscrizioni: ${_data(chiusuraIscrizioni)}',
-                ),
-                trailing: Wrap(
-                  children: [
-                    if (chiusuraIscrizioni != null)
-                      IconButton(
-                        tooltip: 'Rimuovi chiusura iscrizioni',
-                        onPressed: () => setState(() => chiusuraIscrizioni = null),
-                        icon: const Icon(Icons.clear),
-                      ),
-                    IconButton(
-                      tooltip: 'Scegli chiusura iscrizioni',
-                      onPressed: () => _scegliData((valore) {
-                        setState(() => chiusuraIscrizioni = valore);
-                      }, chiusuraIscrizioni),
-                      icon: const Icon(Icons.calendar_month_outlined),
-                    ),
-                  ],
-                ),
-              ),
-              DropdownButtonFormField<String>(
-                initialValue: tipologia,
-                decoration: const InputDecoration(labelText: 'Tipologia'),
-                items:
-                    [
-                          'Incontro di approfondimento',
-                          'Seminario',
-                          'Workshop',
-                          'Altro',
-                        ]
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                        .toList(),
-                onChanged: (v) => tipologia = v!,
-              ),
-              DropdownButtonFormField<String>(
-                initialValue: modalita,
-                decoration: const InputDecoration(labelText: 'Modalità'),
-                items: ['In presenza', 'A distanza', 'Misto']
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                    .toList(),
-                onChanged: (v) => modalita = v!,
-              ),
-              SwitchListTile(
-                title: const Text('Questionario di gradimento attivo'),
-                value: questionario,
-                onChanged: (v) => setState(() => questionario = v),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Annulla'),
-      ),
-      FilledButton(onPressed: _salva, child: const Text('Salva')),
-    ],
-  );
-
-  void _salva() {
-    if (!(form.currentState?.validate() ?? false)) return;
-    final dati = <String, dynamic>{
-      for (final e in campi.entries)
-        e.key: e.value.text.trim().isEmpty ? null : e.value.text.trim(),
-    };
-    dati['data_evento'] = dataEvento?.toIso8601String().split('T').first;
-    dati['data_apertura_iscrizioni'] =
-        aperturaIscrizioni?.toIso8601String().split('T').first;
-    dati['data_chiusura_iscrizioni'] =
-        chiusuraIscrizioni?.toIso8601String().split('T').first;
-    dati['tipologia'] = tipologia;
-    dati['modalita'] = modalita;
-    dati['questionario_gradimento_attivo'] = questionario;
-    Navigator.pop(context, dati);
-  }
-
-  Future<void> _scegliData(
-    ValueChanged<DateTime?> onChanged,
-    DateTime? valoreIniziale,
-  ) async {
-    final DateTime? scelta = await showDatePicker(
-      context: context,
-      initialDate: valoreIniziale ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    onChanged(scelta);
-  }
-}
-
 String _testo(Object? valore) => valore?.toString().trim() ?? '';
+
 String _data(Object? valore) {
   final data = DateTime.tryParse(_testo(valore));
   if (data == null) return _testo(valore);
-  return '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+  return '${data.day.toString().padLeft(2, '0')}/'
+      '${data.month.toString().padLeft(2, '0')}/${data.year}';
 }

@@ -44,6 +44,8 @@ abstract final class AppMenuController {
     AppRole.owner,
   };
 
+  static const Set<AppRole> _soloOwner = <AppRole>{AppRole.owner};
+
   static const List<VoceMenu> voci = <VoceMenu>[
     VoceMenu(
       titolo: 'News',
@@ -102,9 +104,37 @@ abstract final class AppMenuController {
       ruoli: _tutti,
     ),
     VoceMenu(
-      titolo: 'Amministrazione',
-      icona: Icons.admin_panel_settings_outlined,
-      percorso: '/amministrazione',
+      titolo: 'Database',
+      icona: Icons.storage_outlined,
+      percorso: '/gestione/database',
+      sezione: MenuSezione.gestione,
+      ruoli: _soloOwner,
+    ),
+    VoceMenu(
+      titolo: 'Partecipanti',
+      icona: Icons.people_outline,
+      percorso: '/gestione/partecipanti',
+      sezione: MenuSezione.gestione,
+      ruoli: _amministratori,
+    ),
+    VoceMenu(
+      titolo: 'Anni accademici',
+      icona: Icons.calendar_month_outlined,
+      percorso: '/gestione/anni-accademici',
+      sezione: MenuSezione.gestione,
+      ruoli: _amministratori,
+    ),
+    VoceMenu(
+      titolo: 'Controllo partecipanti',
+      icona: Icons.fact_check_outlined,
+      percorso: '/gestione/controllo-partecipanti',
+      sezione: MenuSezione.gestione,
+      ruoli: _amministratori,
+    ),
+    VoceMenu(
+      titolo: 'Notifiche',
+      icona: Icons.notifications_outlined,
+      percorso: '/gestione/notifiche',
       sezione: MenuSezione.gestione,
       ruoli: _amministratori,
     ),
