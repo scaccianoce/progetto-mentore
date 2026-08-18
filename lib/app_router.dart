@@ -15,6 +15,7 @@ import 'pagine/house_of_mentore/house_of_mentore_page.dart';
 import 'pagine/insegnamento/insegnamento_page.dart';
 import 'pagine/login/login_page.dart';
 import 'pagine/news/news_page.dart';
+import 'pagine/notifiche/notifiche_page.dart';
 import 'pagine/profilo/profilo_page.dart';
 import 'pagine/ruolo_mentee/mentee_page.dart';
 import 'pagine/ruolo_mentore/mentore_page.dart';
@@ -52,6 +53,10 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
         GoRoute(
           path: '/news',
           builder: (_, _) => NewsPage(sessione: sessione),
+        ),
+        GoRoute(
+          path: '/notifiche',
+          builder: (_, _) => const NotifichePage(),
         ),
         GoRoute(
           path: '/profilo',

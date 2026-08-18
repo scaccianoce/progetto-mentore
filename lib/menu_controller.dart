@@ -55,6 +55,13 @@ abstract final class AppMenuController {
       ruoli: _tutti,
     ),
     VoceMenu(
+      titolo: 'Notifiche',
+      icona: Icons.notifications_none_outlined,
+      percorso: '/notifiche',
+      sezione: MenuSezione.news,
+      ruoli: _tutti,
+    ),
+    VoceMenu(
       titolo: 'Il mio profilo',
       icona: Icons.person_outline,
       percorso: '/profilo',

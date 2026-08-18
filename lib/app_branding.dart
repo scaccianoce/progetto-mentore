@@ -6,4 +6,5 @@ abstract final class AppBranding {
   ///   assets/icon/menu_logo.png
   /// e dichiarato nel pubspec.yaml tra gli assets Flutter.
   static const String logoAsset = 'assets/icon/menu_logo.png';
+  static const String logoAssetWOtext = 'assets/icon/app_icon.png';
 }

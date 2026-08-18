@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'app_branding.dart';
 import 'menu_controller.dart';
+import 'pagine/notifiche/notifiche_badge.dart';
 import 'sessione_controller.dart';
 
 class MenuPage extends StatelessWidget {
@@ -101,7 +102,7 @@ class _PannelloMenu extends StatelessWidget {
                   width: 48,
                   height: 48,
                   child: Image.asset(
-                    AppBranding.logoAsset,
+                    AppBranding.logoAssetWOtext,
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -182,6 +183,9 @@ class _PannelloMenu extends StatelessWidget {
         ListTile(
           leading: Icon(voce.icona),
           title: Text(voce.titolo),
+          trailing: voce.percorso == '/notifiche'
+              ? const NotificheBadge()
+              : null,
           selected: percorso.startsWith(voce.percorso),
           onTap: () {
             if (chiudiPrimaDiNavigare) {

@@ -42,8 +42,8 @@ class MenteeController extends ChangeNotifier {
           .from('mentoraggi')
           .select(
             'id, insegnamento_id, data_visita_1, data_visita_2, '
-            'data_visita_3, data_visita_4, osservazioni_aula, '
-            'data_focus_group, osservazioni_focus_group, link_questionario, '
+            'data_visita_3, data_visita_4, data_focus_group, '
+            //'osservazioni_aula, osservazioni_focus_group, link_questionario, '
             'data_incontro_finale, scheda_sintesi, data_invio_scheda, stato',
           )
           .eq('insegnamento_id', insegnamento!['id'])

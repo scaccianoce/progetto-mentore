@@ -1,24 +1,43 @@
 import 'package:flutter/material.dart';
 
-import '../../dinamico/maschera_dinamica_controller.dart';
-import '../template/pagina_elenco_dettaglio_crud_dinamica.dart';
+import 'notifiche_messaggi_backoffice_page.dart';
+import 'notifiche_regole_backoffice_page.dart';
 
-/// Centro notifiche owner/organizer.
+/// Gestione notifiche riservata a owner e organizer.
 ///
-/// Le scelte (tipo, stato, trigger) sono ENUM del database e vengono quindi
-/// caricate automaticamente dal motore dinamico. Nessun elenco e hard-coded.
+/// Il router/menu applicano il controllo di ruolo; le RLS DB devono mantenere
+/// lo stesso vincolo lato server.
 class NotificheBackofficePage extends StatelessWidget {
   const NotificheBackofficePage({super.key});
 
   @override
-  Widget build(BuildContext context) => const PaginaElencoDettaglioCrudDinamica(
-        titolo: 'Notifiche',
-        configurazione: ConfigurazionePaginaDinamica(tabella: 'notifiche'),
-        campoTitolo: 'titolo',
-        campoSottotitolo: 'programmata_per',
-        puoGestire: true,
-        ordinamenti: [],
-        messaggioVuoto:
-            'Nessuna notifica. Installa le tabelle indicate in BACKOFFICE_DATABASE.sql.',
-      );
+  Widget build(BuildContext context) {
+    return const DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        body: SafeArea(
+          minimum: EdgeInsets.all(16),
+          child: Column(
+            children: <Widget>[
+              TabBar(
+                tabs: <Widget>[
+                  Tab(icon: Icon(Icons.notifications_outlined), text: 'Messaggi'),
+                  Tab(icon: Icon(Icons.rule_outlined), text: 'Regole'),
+                ],
+              ),
+              SizedBox(height: 16),
+              Expanded(
+                child: TabBarView(
+                  children: <Widget>[
+                    NotificheMessaggiBackofficePage(),
+                    NotificheRegoleBackofficePage(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

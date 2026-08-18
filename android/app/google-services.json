@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "168070790692",
+    "project_id": "progmentore-9b804",
+    "storage_bucket": "progmentore-9b804.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:168070790692:android:dfd67721b1bf5dc5b4e2b1",
+        "android_client_info": {
+          "package_name": "com.example.prog_mentore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBrhOxTXvcMlAhEz9iOSvHTdqysLT0rsDg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

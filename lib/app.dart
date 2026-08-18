@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'app_router.dart';
+import 'notifiche_push_service.dart';
 import 'sessione_controller.dart';
 
 class MentoreApp extends StatefulWidget {
@@ -16,6 +19,7 @@ class MentoreApp extends StatefulWidget {
 class _MentoreAppState extends State<MentoreApp> {
   SessioneController? sessione;
   GoRouter? router;
+  StreamSubscription<dynamic>? _notificheAperteSubscription;
 
   @override
   void initState() {
@@ -23,11 +27,19 @@ class _MentoreAppState extends State<MentoreApp> {
     if (widget.erroreAvvio == null) {
       sessione = SessioneController()..inizializza();
       router = creaAppRouter(sessione!);
+
+      _notificheAperteSubscription =
+          NotifichePushService.instance.apertureNotifiche.listen((messaggio) {
+        final percorso =
+            NotifichePushService.instance.percorsoPer(messaggio);
+        router?.go(percorso);
+      });
     }
   }
 
   @override
   void dispose() {
+    _notificheAperteSubscription?.cancel();
     router?.dispose();
     sessione?.dispose();
     super.dispose();
@@ -43,6 +55,7 @@ class _MentoreAppState extends State<MentoreApp> {
         floatingLabelStyle: TextStyle(fontWeight: FontWeight.bold),
       ),
     );
+
     if (widget.erroreAvvio != null) {
       return MaterialApp(
         title: 'Progetto Mentore per la Didattica',
@@ -53,6 +66,7 @@ class _MentoreAppState extends State<MentoreApp> {
         ),
       );
     }
+
     return MaterialApp.router(
       title: 'Progetto Mentore per la Didattica',
       debugShowCheckedModeBanner: false,

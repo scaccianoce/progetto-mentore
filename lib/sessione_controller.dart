@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_exception.dart';
 import 'supabase_config.dart';
+import 'notifiche_push_service.dart';
 
 enum AppRole {
   participant,
@@ -88,6 +89,7 @@ class SessioneController extends ChangeNotifier {
     _errore = null;
 
     try {
+      await NotifichePushService.instance.disattivaDispositivoCorrente();
       await _client.auth.signOut();
       await _caricaUtente(null);
     } catch (errore) {

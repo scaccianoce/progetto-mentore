@@ -1,0 +1,4 @@
+# Aggiungi al supabase/config.toml se fai deploy via CLI.
+# Nel Dashboard equivale a disabilitare "Verify JWT" per questa funzione.
+[functions.notifiche-invia]
+verify_jwt = false
