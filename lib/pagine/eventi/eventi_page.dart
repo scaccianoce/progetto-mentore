@@ -1,27 +1,37 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../backoffice/questionari_controller.dart';
+import '../backoffice/questionario_interno_dialog.dart';
 import '../template/componenti_pagina_dinamica.dart';
 import '../template/template_elenco_dettaglio_page.dart';
 import 'eventi_controller.dart';
 
 class EventiPage extends StatefulWidget {
-  const EventiPage({super.key, required this.sessione});
+  const EventiPage({
+    super.key,
+    required this.sessione,
+  });
 
   final SessioneController sessione;
 
   @override
-  State<EventiPage> createState() => _EventiPageState();
+  State<EventiPage> createState() =>
+      _EventiPageState();
 }
 
 class _EventiPageState extends State<EventiPage> {
   late final EventiController controller;
+  late final QuestionariController questionariController;
 
-  bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
+  bool get _partecipante =>
+      widget.sessione.ruolo == AppRole.participant;
 
-  /// PERSONALIZZAZIONE EVENTI: solo tipi, scelte e vincoli speciali.
   ConfigurazionePaginaDinamica get _configurazione =>
       ConfigurazionePaginaDinamica(
         tabella: 'eventi',
@@ -32,17 +42,16 @@ class _EventiPageState extends State<EventiPage> {
           'anno_accademico': PersonalizzazioneCampo(
             tipo: TipoCampoDinamico.scelta,
             valoriScelta: controller.anniAccademici,
+            nascosto: false,
             modificabilePartecipante: false,
           ),
           'data_evento': const PersonalizzazioneCampo(
             modificabilePartecipante: false,
           ),
           'tipologia': const PersonalizzazioneCampo(
-            // Opzioni lette dal PostgreSQL ENUM del DB.
             modificabilePartecipante: false,
           ),
           'modalita': const PersonalizzazioneCampo(
-            // Opzioni lette dal PostgreSQL ENUM del DB.
             modificabilePartecipante: false,
           ),
           'descrizione': const PersonalizzazioneCampo(
@@ -55,31 +64,24 @@ class _EventiPageState extends State<EventiPage> {
           'moderatori': const PersonalizzazioneCampo(
             modificabilePartecipante: false,
           ),
-          'note_organizzative': const PersonalizzazioneCampo(
+          'note_organizzative':
+              const PersonalizzazioneCampo(
             modificabilePartecipante: false,
           ),
           for (final campo in <String>[
             'luogo',
-            'locandina_path',
-            'modulo_partecipazione_url',
             'data_apertura_iscrizioni',
             'data_chiusura_iscrizioni',
           ])
             campo: const PersonalizzazioneCampo(
               modificabilePartecipante: false,
             ),
+          'locandina_url': const PersonalizzazioneCampo(
+            nascosto: true,
+            modificabilePartecipante: false,
+          ),
           'attiva': PersonalizzazioneCampo(
-            // Nascosto ai partecipanti; owner/organizer possono decidere
-            // direttamente se l'evento e pubblicato.
             nascosto: _partecipante,
-            modificabilePartecipante: false,
-          ),
-          'questionario_gradimento_attivo': const PersonalizzazioneCampo(
-            visibilePartecipante: false,
-            modificabilePartecipante: false,
-          ),
-          'link_questionario_gradimento': const PersonalizzazioneCampo(
-            visibilePartecipante: false,
             modificabilePartecipante: false,
           ),
         },
@@ -88,98 +90,234 @@ class _EventiPageState extends State<EventiPage> {
   @override
   void initState() {
     super.initState();
-    controller = EventiController(widget.sessione)..carica();
+
+    controller =
+        EventiController(widget.sessione)
+          ..carica();
+
+    questionariController =
+        QuestionariController(widget.sessione)
+          ..carica();
   }
 
   @override
   void dispose() {
     controller.dispose();
+    questionariController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) => TemplatePaginaElencoDettaglio(
-      caricamento: controller.caricamento && controller.eventi.isEmpty,
-      errore: controller.errore,
-      vuoto: controller.eventi.isEmpty,
-      messaggioVuoto: 'Nessun evento disponibile.',
-      larghezzaElenco: 340,
-      intestazione: IntestazionePaginaDinamica(
-        titolo: 'Eventi',
-        onAggiorna: controller.carica,
-        onNuovo: controller.puoGestire ? () => _apriEditor() : null,
-      ),
-      elenco: ElencoRecordDinamico<Map<String, dynamic>>(
-        elementi: controller.eventi,
-        idSelezionato: controller.eventoSelezionatoId,
-        id: (evento) => evento['id'].toString(),
-        titolo: (evento) => evento['titolo']?.toString() ?? '',
-        sottotitolo: (evento) => _data(evento['data_evento']),
-        trailing: (evento) => controller.iscritto(evento['id'].toString())
-            ? const Icon(Icons.check_circle, color: Colors.green)
-            : null,
-        onSeleziona: controller.seleziona,
-      ),
-      dettaglio: controller.eventoSelezionato == null
-          ? const Center(child: Text('Seleziona un evento.'))
-          : Card(
-              margin: EdgeInsets.zero,
-              child: _dettaglio(controller.eventoSelezionato!),
-            ),
-    ),
-  );
+  Widget build(BuildContext context) =>
+      AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) =>
+            TemplatePaginaElencoDettaglio(
+          caricamento:
+              controller.caricamento &&
+                  controller.eventi.isEmpty,
+          errore: controller.errore,
+          vuoto: controller.eventi.isEmpty,
+          messaggioVuoto:
+              'Nessun evento disponibile.',
+          larghezzaElenco: 340,
+          intestazione:
+              IntestazionePaginaDinamica(
+            titolo: 'Eventi',
+            onAggiorna: controller.carica,
+            onNuovo: controller.puoGestire
+                ? () => _apriEditor()
+                : null,
+          ),
+          elenco:
+              ElencoRecordDinamico<Map<String, dynamic>>(
+            elementi: controller.eventi,
+            idSelezionato:
+                controller.eventoSelezionatoId,
+            id: (evento) =>
+                evento['id'].toString(),
+            titolo: (evento) =>
+                evento['titolo']?.toString() ?? '',
+            sottotitolo: (evento) =>
+                _data(evento['data_evento']),
+            trailing: (evento) =>
+                controller.iscritto(
+                  evento['id'].toString(),
+                )
+                    ? const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                      )
+                    : null,
+            onSeleziona: controller.seleziona,
+          ),
+          dettaglio:
+              controller.eventoSelezionato == null
+                  ? const Center(
+                      child:
+                          Text('Seleziona un evento.'),
+                    )
+                  : Card(
+                      margin: EdgeInsets.zero,
+                      child: _dettaglio(
+                        controller
+                            .eventoSelezionato!,
+                      ),
+                    ),
+        ),
+      );
 
-  Widget _dettaglio(Map<String, dynamic> evento) {
+  Widget _dettaglio(
+    Map<String, dynamic> evento,
+  ) {
     final id = evento['id'].toString();
     final iscritto = controller.iscritto(id);
-    final aperte = controller.iscrizioniAperte(evento);
+    final aperte =
+        controller.iscrizioniAperte(evento);
+    final presente =
+        controller.presente(id);
+    final haQuestionario =
+        controller.haQuestionario(id);
+    final compilato =
+        controller.questionarioCompilato(id);
+
+    final locandina =
+        _testo(evento['locandina_url']);
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: <Widget>[
+        if (locandina.isNotEmpty) ...[
+          ClipRRect(
+            borderRadius:
+                BorderRadius.circular(12),
+            child: Image.network(
+              locandina,
+              fit: BoxFit.contain,
+              errorBuilder:
+                  (context, error, stackTrace) =>
+                      const Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'Impossibile caricare la locandina.',
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+
         CampiTabellaDinamici(
-          configurazione: _configurazione,
+          configurazione:
+              _configurazione,
           valori: evento,
-          partecipante: _partecipante,
+          partecipante:
+              _partecipante,
         ),
+
         const SizedBox(height: 16),
+
         FilledButton.icon(
-          onPressed: aperte ? () => _cambiaIscrizione(evento) : null,
-          icon: Icon(iscritto ? Icons.event_busy : Icons.event_available),
-          label: Text(iscritto ? 'Annulla iscrizione' : 'Iscriviti'),
+          onPressed: aperte
+              ? () => _cambiaIscrizione(evento)
+              : null,
+          icon: Icon(
+            iscritto
+                ? Icons.event_busy
+                : Icons.event_available,
+          ),
+          label: Text(
+            iscritto
+                ? 'Annulla iscrizione'
+                : 'Iscriviti',
+          ),
         ),
+
         if (!aperte)
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Text('Le iscrizioni non sono aperte.'),
+            child: Text(
+              'Le iscrizioni non sono aperte.',
+            ),
           ),
-        if (iscritto &&
-            evento['questionario_gradimento_attivo'] == true &&
-            _testo(evento['link_questionario_gradimento']).isNotEmpty) ...[
+
+        if (iscritto && haQuestionario) ...[
           const SizedBox(height: 16),
-          const Text(
-            'Questionario di gradimento',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          Card(
+            child: Padding(
+              padding:
+                  const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Questionario di gradimento',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (compilato)
+                    const ListTile(
+                      contentPadding:
+                          EdgeInsets.zero,
+                      leading: Icon(
+                        Icons.check_circle_outline,
+                      ),
+                      title: Text(
+                        'Questionario compilato',
+                      ),
+                    )
+                  else if (!presente)
+                    const Text(
+                      'Il questionario sarà disponibile '
+                      'dopo che la presenza sarà stata '
+                      'registrata dall’organizzazione.',
+                    )
+                  else
+                    FilledButton.tonalIcon(
+                      onPressed: () =>
+                          _apriQuestionario(id),
+                      icon: const Icon(
+                        Icons.quiz_outlined,
+                      ),
+                      label: const Text(
+                        'Compila questionario',
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-          SelectableText(_testo(evento['link_questionario_gradimento'])),
         ],
+
         if (controller.puoGestire) ...[
           const Divider(height: 32),
           _elencoIscrittiEvento(evento),
           const Divider(height: 32),
+
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: <Widget>[
               OutlinedButton.icon(
-                onPressed: () => _apriEditor(evento),
-                icon: const Icon(Icons.edit),
-                label: const Text('Modifica'),
+                onPressed: () =>
+                    _apriEditor(evento),
+                icon:
+                    const Icon(Icons.edit),
+                label:
+                    const Text('Modifica'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _elimina(evento),
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Elimina'),
+                onPressed: () =>
+                    _elimina(evento),
+                icon: const Icon(
+                  Icons.delete_outline,
+                ),
+                label:
+                    const Text('Elimina'),
               ),
             ],
           ),
@@ -188,37 +326,72 @@ class _EventiPageState extends State<EventiPage> {
     );
   }
 
-  Widget _elencoIscrittiEvento(Map<String, dynamic> evento) {
-    final eventoId = evento['id'].toString();
-    final iscritti = controller.iscritti(eventoId);
+  Widget _elencoIscrittiEvento(
+    Map<String, dynamic> evento,
+  ) {
+    final eventoId =
+        evento['id'].toString();
+    final iscritti =
+        controller.iscritti(eventoId);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
           'Iscritti (${iscritti.length})',
-          style: Theme.of(context).textTheme.titleMedium,
+          style:
+              Theme.of(context)
+                  .textTheme
+                  .titleMedium,
         ),
         const SizedBox(height: 8),
+
         if (iscritti.isEmpty)
-          const Text('Nessun partecipante iscritto.')
+          const Text(
+            'Nessun partecipante iscritto.',
+          )
         else
           SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection:
+                Axis.horizontal,
             child: DataTable(
-              columns: const <DataColumn>[
-                DataColumn(label: Text('#'), numeric: true),
-                DataColumn(label: Text('Partecipante')),
-                DataColumn(label: Text('Presente')),
-                DataColumn(label: Text('Questionario compilato')),
-                DataColumn(label: Text('Data compilazione')),
+              columns:
+                  const <DataColumn>[
+                DataColumn(
+                  label: Text('#'),
+                  numeric: true,
+                ),
+                DataColumn(
+                  label:
+                      Text('Partecipante'),
+                ),
+                DataColumn(
+                  label: Text('Presente'),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Questionario compilato',
+                  ),
+                ),
+                DataColumn(
+                  label: Text(
+                    'Data compilazione',
+                  ),
+                ),
               ],
               rows: <DataRow>[
-                for (var indice = 0; indice < iscritti.length; indice++)
+                for (
+                  var indice = 0;
+                  indice < iscritti.length;
+                  indice++
+                )
                   _rigaIscrittoEvento(
-                    eventoId: eventoId,
+                    eventoId:
+                        eventoId,
                     indice: indice,
-                    partecipazione: iscritti[indice],
+                    partecipazione:
+                        iscritti[indice],
                   ),
               ],
             ),
@@ -230,160 +403,702 @@ class _EventiPageState extends State<EventiPage> {
   DataRow _rigaIscrittoEvento({
     required String eventoId,
     required int indice,
-    required Map<String, dynamic> partecipazione,
+    required Map<String, dynamic>
+        partecipazione,
   }) {
-    final partecipanteId = partecipazione['partecipante_id']?.toString() ?? '';
-    final presente = partecipazione['presente'] == true;
-    final questionario = partecipazione['questionario_compilato'] == true;
-    final dataCompilazione = DateTime.tryParse(
-      partecipazione['data_compilazione']?.toString() ?? '',
+    final partecipanteId =
+        partecipazione['partecipante_id']
+                ?.toString() ??
+            '';
+
+    final presente =
+        partecipazione['presente'] == true;
+
+    final questionario =
+        controller.questionarioCompilato(
+      eventoId,
+      partecipanteId:
+          partecipanteId,
     );
 
-    Future<void> salva({
-      bool? nuovoPresente,
-      bool? nuovoQuestionario,
-      DateTime? nuovaData,
-      bool modificaData = false,
-    }) async {
-      final errore = await controller.aggiornaPartecipazione(
-        eventoId: eventoId,
-        partecipanteId: partecipanteId,
-        presente: nuovoPresente ?? presente,
-        questionarioCompilato: nuovoQuestionario ?? questionario,
-        dataCompilazione: modificaData ? nuovaData : dataCompilazione,
-      );
-      if (!mounted || errore == null) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errore)),
-      );
-    }
+    final dataCompilazione =
+        controller.dataCompilazione(
+      eventoId,
+      partecipanteId,
+    );
 
     return DataRow(
       cells: <DataCell>[
-        DataCell(Text('${indice + 1}')),
-        DataCell(Text(controller.nomePartecipante(partecipanteId))),
+        DataCell(
+          Text('${indice + 1}'),
+        ),
+        DataCell(
+          Text(
+            controller.nomePartecipante(
+              partecipanteId,
+            ),
+          ),
+        ),
         DataCell(
           Checkbox(
             value: presente,
-            onChanged: (valore) {
-              if (valore != null) salva(nuovoPresente: valore);
-            },
-          ),
-        ),
-        DataCell(
-          Checkbox(
-            value: questionario,
-            onChanged: (valore) {
-              if (valore != null) salva(nuovoQuestionario: valore);
-            },
-          ),
-        ),
-        DataCell(
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(dataCompilazione == null ? '—' : _data(dataCompilazione)),
-              IconButton(
-                tooltip: 'Modifica data compilazione',
-                icon: const Icon(Icons.calendar_month_outlined),
-                onPressed: () async {
-                  final scelta = await showDatePicker(
-                    context: context,
-                    initialDate: dataCompilazione ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2200),
-                  );
-                  if (scelta != null) {
-                    await salva(nuovaData: scelta, modificaData: true);
-                  }
-                },
-              ),
-              if (dataCompilazione != null)
-                IconButton(
-                  tooltip: 'Cancella data compilazione',
-                  icon: const Icon(Icons.clear),
-                  onPressed: () => salva(nuovaData: null, modificaData: true),
+            onChanged: (valore) async {
+              if (valore == null) return;
+
+              final errore =
+                  await controller
+                      .aggiornaPresenza(
+                eventoId: eventoId,
+                partecipanteId:
+                    partecipanteId,
+                presente: valore,
+              );
+
+              if (!mounted ||
+                  errore == null) {
+                return;
+              }
+
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(
+                SnackBar(
+                  content: Text(errore),
                 ),
-            ],
+              );
+            },
+          ),
+        ),
+        DataCell(
+          Icon(
+            questionario
+                ? Icons.check_circle
+                : Icons.remove_circle_outline,
+          ),
+        ),
+        DataCell(
+          Text(
+            dataCompilazione == null
+                ? '—'
+                : _data(
+                    dataCompilazione,
+                  ),
           ),
         ),
       ],
     );
   }
 
-  Future<void> _cambiaIscrizione(Map<String, dynamic> evento) async {
-    final errore = await controller.cambiaIscrizione(evento);
-    if (mounted && errore != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errore)));
+  Future<void> _apriQuestionario(
+    String eventoId,
+  ) async {
+    final compilato =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          QuestionarioInternoDialog(
+        controller:
+            questionariController,
+        eventoId: eventoId,
+      ),
+    );
+
+    if (compilato == true) {
+      await controller.carica();
     }
   }
 
-  Future<void> _apriEditor([Map<String, dynamic>? evento]) async {
-    final iniziali =
-        evento ??
-        <String, dynamic>{
-          'titolo': '',
-          'anno_accademico': controller.anniAccademici.isEmpty
-              ? null
-              : controller.anniAccademici.first,
-          'questionario_gradimento_attivo': false,
-          'attiva': true,
-        };
+  Future<void> _cambiaIscrizione(
+    Map<String, dynamic> evento,
+  ) async {
+    final errore =
+        await controller
+            .cambiaIscrizione(evento);
+
+    if (mounted && errore != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(content: Text(errore)),
+      );
+    }
+  }
+
+  Future<void> _apriEditor([
+    Map<String, dynamic>? evento,
+  ]) async {
+    if (controller.anniAccademici.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Nessun anno accademico disponibile.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Ricarica i template per avere sempre l'elenco aggiornato.
+    await questionariController.carica();
+
+    if (!mounted) return;
+
+    final templatePartecipanti =
+        questionariController.templatePer('partecipanti');
+
+    final questionarioEsistente = evento == null
+        ? null
+        : questionariController.questionarioEvento(
+            evento['id'].toString(),
+          );
+
+    final configurazioneIniziale =
+        await _scegliConfigurazioneEvento(
+      annoIniziale:
+          evento?['anno_accademico']?.toString() ??
+              controller.anniAccademici.first,
+      templateIniziale:
+          questionarioEsistente?['template_id']?.toString(),
+      templateDisponibili: templatePartecipanti,
+      locandinaUrlIniziale:
+          evento?['locandina_url']?.toString(),
+    );
+
+    if (configurazioneIniziale == null) {
+      return;
+    }
+
+    final annoSelezionato =
+        configurazioneIniziale.annoAccademico;
+
+    final templateSelezionato =
+        configurazioneIniziale.templateQuestionarioId;
+
+    final locandinaBytes =
+        configurazioneIniziale.locandinaBytes;
+    final locandinaNomeFile =
+        configurazioneIniziale.locandinaNomeFile;
+    final rimuoviLocandina =
+        configurazioneIniziale.rimuoviLocandina;
+
+    final iniziali = evento == null
+        ? <String, dynamic>{
+            'titolo': '',
+            'anno_accademico': annoSelezionato,
+            'attiva': true,
+          }
+        : Map<String, dynamic>.from(evento)
+      ..['anno_accademico'] = annoSelezionato;
+
+    if (!mounted) return;
+
     final risultato = await mostraMascheraDinamica(
       context: context,
       configurazione: _configurazione,
       valoriIniziali: iniziali,
       partecipante: _partecipante,
-      titolo: evento == null ? 'Nuovo evento' : 'Modifica evento',
+      titolo: evento == null
+          ? 'Nuovo evento'
+          : 'Modifica evento',
     );
+
     if (risultato == null) return;
+
+    risultato['anno_accademico'] =
+        annoSelezionato;
+
     final errore = await controller.salva(
       id: evento?['id']?.toString(),
       dati: risultato,
+      aggiornaQuestionario: true,
+      templateQuestionarioId:
+          templateSelezionato,
+      locandinaBytes: locandinaBytes,
+      locandinaNomeFile: locandinaNomeFile,
+      rimuoviLocandina: rimuoviLocandina,
     );
-    if (mounted && errore != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errore)));
+
+    if (!mounted) return;
+
+    if (errore != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errore)),
+      );
+      return;
     }
+
+    await questionariController.carica();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          evento == null
+              ? 'Evento creato.'
+              : 'Evento aggiornato.',
+        ),
+      ),
+    );
   }
 
-  Future<void> _elimina(Map<String, dynamic> evento) async {
-    final conferma =
+  Future<_ConfigurazioneEvento?>
+      _scegliConfigurazioneEvento({
+    required String annoIniziale,
+    required String? templateIniziale,
+    required List<Map<String, dynamic>>
+        templateDisponibili,
+    required String? locandinaUrlIniziale,
+  }) async {
+    var anno = annoIniziale;
+    String template =
+        templateIniziale ?? '';
+
+    Uint8List? locandinaBytes;
+    String? locandinaNomeFile;
+    var rimuoviLocandina = false;
+    String? erroreLocandina;
+
+    return showDialog<_ConfigurazioneEvento>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder:
+            (dialogContext, setDialogState) =>
+                AlertDialog(
+          title: const Text(
+            'Configurazione evento',
+          ),
+          content: SizedBox(
+            width: 620,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize:
+                    MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: anno,
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Anno accademico',
+                      border:
+                          OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final valore
+                          in controller
+                              .anniAccademici)
+                        DropdownMenuItem(
+                          value: valore,
+                          child: Text(valore),
+                        ),
+                    ],
+                    onChanged: (valore) {
+                      if (valore != null) {
+                        setDialogState(
+                          () => anno = valore,
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: template,
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(
+                      labelText:
+                          'Questionario di gradimento',
+                      border:
+                          OutlineInputBorder(),
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text(
+                          'Nessun questionario',
+                        ),
+                      ),
+                      for (final modello
+                          in templateDisponibili)
+                        DropdownMenuItem(
+                          value:
+                              modello['id'].toString(),
+                          child: Text(
+                            modello['titolo']
+                                    ?.toString() ??
+                                'Template',
+                          ),
+                        ),
+                    ],
+                    onChanged: (valore) {
+                      setDialogState(
+                        () => template =
+                            valore ?? '',
+                      );
+                    },
+                  ),
+                  if (templateDisponibili.isEmpty)
+                    const Padding(
+                      padding:
+                          EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Nessun template per partecipanti attivo. '
+                        'Puoi creare l’evento senza questionario '
+                        'e associarlo successivamente.',
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Locandina',
+                    style: Theme.of(dialogContext)
+                        .textTheme
+                        .titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(
+                      minHeight: 140,
+                      maxHeight: 260,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(dialogContext)
+                            .colorScheme
+                            .outlineVariant,
+                      ),
+                      borderRadius:
+                          BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: locandinaBytes != null
+                        ? Image.memory(
+                            locandinaBytes!,
+                            fit: BoxFit.contain,
+                          )
+                        : (!rimuoviLocandina &&
+                                _testo(locandinaUrlIniziale)
+                                    .isNotEmpty)
+                            ? Image.network(
+                                locandinaUrlIniziale!,
+                                fit: BoxFit.contain,
+                                errorBuilder:
+                                    (_, _, _) =>
+                                        const Padding(
+                                  padding:
+                                      EdgeInsets.all(16),
+                                  child: Text(
+                                    'Anteprima non disponibile. '
+                                    'Puoi sostituire la locandina.',
+                                  ),
+                                ),
+                              )
+                            : const Padding(
+                                padding:
+                                    EdgeInsets.all(24),
+                                child: Text(
+                                  'Nessuna locandina',
+                                ),
+                              ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    locandinaNomeFile ??
+                        (rimuoviLocandina
+                            ? 'La locandina attuale verrà eliminata.'
+                            : 'JPG, JPEG o PNG · massimo 300 KB'),
+                    style: Theme.of(dialogContext)
+                        .textTheme
+                        .bodySmall,
+                  ),
+                  if (erroreLocandina != null)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(top: 6),
+                      child: Text(
+                        erroreLocandina!,
+                        style: TextStyle(
+                          color:
+                              Theme.of(dialogContext)
+                                  .colorScheme
+                                  .error,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          final file =
+                              await FilePicker.pickFile(
+                            type: FileType.custom,
+                            allowedExtensions: const [
+                              'jpg',
+                              'jpeg',
+                              'png',
+                            ],
+                          );
+
+                          if (file == null ||
+                              !dialogContext.mounted) {
+                            return;
+                          }
+
+                          final bytes =
+                              await file.readAsBytes();
+
+                          if (!dialogContext.mounted) {
+                            return;
+                          }
+
+                          if (bytes.lengthInBytes >
+                              EventiController
+                                  .dimensioneMassimaLocandina) {
+                            setDialogState(() {
+                              erroreLocandina =
+                                  'Il file supera il limite massimo di 300 KB.';
+                            });
+                            return;
+                          }
+
+                          setDialogState(() {
+                            locandinaBytes = bytes;
+                            locandinaNomeFile =
+                                file.name;
+                            rimuoviLocandina = false;
+                            erroreLocandina = null;
+                          });
+                        },
+                        icon: const Icon(
+                          Icons.upload_file_outlined,
+                        ),
+                        label: Text(
+                          locandinaUrlIniziale == null &&
+                                  locandinaBytes == null
+                              ? 'Carica immagine'
+                              : 'Sostituisci',
+                        ),
+                      ),
+                      if (_testo(locandinaUrlIniziale)
+                              .isNotEmpty ||
+                          locandinaBytes != null)
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setDialogState(() {
+                              locandinaBytes = null;
+                              locandinaNomeFile = null;
+                              rimuoviLocandina = true;
+                              erroreLocandina = null;
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.delete_outline,
+                          ),
+                          label: const Text(
+                            'Elimina locandina',
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext),
+              child:
+                  const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(
+                dialogContext,
+                _ConfigurazioneEvento(
+                  annoAccademico: anno,
+                  templateQuestionarioId:
+                      template.isEmpty
+                          ? null
+                          : template,
+                  locandinaBytes:
+                      locandinaBytes,
+                  locandinaNomeFile:
+                      locandinaNomeFile,
+                  rimuoviLocandina:
+                      rimuoviLocandina,
+                ),
+              ),
+              child:
+                  const Text('Continua'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+Future<void> _elimina(
+  Map<String, dynamic> evento,
+) async {
+  final dataEvento = DateTime.tryParse(
+    evento['data_evento']?.toString() ?? '',
+  );
+
+  final oggi = DateTime.now();
+  final oggiSoloData =
+      DateTime(oggi.year, oggi.month, oggi.day);
+
+  final eventoPassato =
+      dataEvento != null &&
+      dataEvento.isBefore(oggiSoloData);
+
+  final conferma =
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text(
+            'Eliminare l’evento?',
+          ),
+          content: Text(
+            eventoPassato
+                ? 'Questo evento risulta già trascorso.\n\n'
+                    'La cancellazione rimuoverà anche le iscrizioni '
+                    'associate.\n\n'
+                    'Vuoi continuare?'
+                : 'La cancellazione rimuoverà anche le iscrizioni '
+                    'associate.\n\n'
+                    'Vuoi continuare?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () =>
+                  Navigator.pop(
+                dialogContext,
+                false,
+              ),
+              child:
+                  const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(
+                dialogContext,
+                true,
+              ),
+              child:
+                  const Text('Continua'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  if (!conferma) return;
+
+  if (!mounted) return;
+
+  // Seconda conferma soltanto per eventi già trascorsi.
+  if (eventoPassato) {
+    final confermaFinale =
         await showDialog<bool>(
           context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Eliminare l’evento?'),
+          builder: (dialogContext) => AlertDialog(
+            title: const Text(
+              'Conferma definitiva',
+            ),
+            content: Text(
+              'Stai per eliminare definitivamente '
+              'l’evento:\n\n'
+              '"${evento['titolo'] ?? ''}"\n\n'
+              'L’operazione non può essere annullata.',
+            ),
             actions: <Widget>[
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('No'),
+                onPressed: () =>
+                    Navigator.pop(
+                  dialogContext,
+                  false,
+                ),
+                child:
+                    const Text('Annulla'),
               ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Sì'),
+              FilledButton.icon(
+                onPressed: () =>
+                    Navigator.pop(
+                  dialogContext,
+                  true,
+                ),
+                icon: const Icon(
+                  Icons.delete_outline,
+                ),
+                label:
+                    const Text('Elimina definitivamente'),
               ),
             ],
           ),
         ) ??
         false;
-    if (!conferma) return;
-    final errore = await controller.elimina(evento['id'].toString());
-    if (mounted && errore != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(errore)));
-    }
+
+    if (!confermaFinale) return;
   }
+
+  final errore =
+      await controller.elimina(
+    evento['id'].toString(),
+  );
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context)
+      .showSnackBar(
+    SnackBar(
+      content: Text(
+        errore ?? 'Evento eliminato.',
+      ),
+    ),
+  );
 }
 
-String _testo(Object? valore) => valore?.toString().trim() ?? '';
+}
+
+
+class _ConfigurazioneEvento {
+  const _ConfigurazioneEvento({
+    required this.annoAccademico,
+    required this.templateQuestionarioId,
+    required this.locandinaBytes,
+    required this.locandinaNomeFile,
+    required this.rimuoviLocandina,
+  });
+
+  final String annoAccademico;
+  final String? templateQuestionarioId;
+  final Uint8List? locandinaBytes;
+  final String? locandinaNomeFile;
+  final bool rimuoviLocandina;
+}
+
+String _testo(Object? valore) =>
+    valore?.toString().trim() ?? '';
 
 String _data(Object? valore) {
-  final data = DateTime.tryParse(_testo(valore));
-  if (data == null) return _testo(valore);
+  final data =
+      valore is DateTime
+          ? valore
+          : DateTime.tryParse(
+              _testo(valore),
+            );
+
+  if (data == null) {
+    return _testo(valore);
+  }
+
   return '${data.day.toString().padLeft(2, '0')}/'
-      '${data.month.toString().padLeft(2, '0')}/${data.year}';
+      '${data.month.toString().padLeft(2, '0')}/'
+      '${data.year}';
 }

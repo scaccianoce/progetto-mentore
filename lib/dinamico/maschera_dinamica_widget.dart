@@ -330,6 +330,12 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
   bool _modificabile(CampoDatabase campo) =>
       campo.modificabilePer(partecipante: widget.partecipante);
 
+
+  String _etichettaCampo(CampoDatabase campo) =>
+      campo.obbligatorio && _modificabile(campo)
+          ? '${campo.etichetta} *'
+          : campo.etichetta;
+
   @override
   void initState() {
     super.initState();
@@ -453,7 +459,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
   Widget _costruisciCampo(CampoDatabase campo) => switch (campo.tipo) {
     TipoCampoDinamico.booleano => SwitchListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(campo.etichetta),
+      title: Text(_etichettaCampo(campo)),
       value: _valori[campo.nome] == true,
       onChanged: _modificabile(campo)
           ? (value) => setState(() => _valori[campo.nome] = value)
@@ -472,7 +478,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
     TipoCampoDinamico.testoFormattato => _modificabile(campo)
         ? EditorTestoFormattato(
             controller: _controller[campo.nome]!,
-            etichetta: campo.etichetta,
+            etichetta: _etichettaCampo(campo),
             minLines: 5,
             maxLines: 10,
             validator: (value) => _validaTesto(campo, value),
@@ -483,7 +489,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
             minLines: 4,
             maxLines: null,
             decoration: InputDecoration(
-              labelText: campo.etichetta,
+              labelText: _etichettaCampo(campo),
               border: const OutlineInputBorder(),
             ),
           ),
@@ -505,7 +511,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
           : null,
       validator: (value) => _validaTesto(campo, value),
       decoration: InputDecoration(
-        labelText: campo.etichetta,
+        labelText: _etichettaCampo(campo),
         alignLabelWithHint: campo.tipo == TipoCampoDinamico.testoMultiriga,
         border: const OutlineInputBorder(),
       ),
@@ -520,18 +526,18 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
       initialValue: corrente,
       isExpanded: true,
       decoration: InputDecoration(
-        labelText: campo.etichetta,
+        labelText: _etichettaCampo(campo),
         border: const OutlineInputBorder(),
       ),
       items: <DropdownMenuItem<String?>>[
-        if (campo.nullable)
+        if (!campo.obbligatorio)
           const DropdownMenuItem<String?>(value: null, child: Text('—')),
         ...scelte.map(
           (value) =>
               DropdownMenuItem<String?>(value: value, child: Text(value)),
         ),
       ],
-      validator: (value) => !campo.nullable && (value == null || value.isEmpty)
+      validator: (value) => campo.obbligatorio && (value == null || value.isEmpty)
           ? 'Campo obbligatorio'
           : null,
       onChanged: _modificabile(campo)
@@ -554,7 +560,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
       initialValue: corrente,
       isExpanded: true,
       decoration: InputDecoration(
-        labelText: campo.etichetta,
+        labelText: _etichettaCampo(campo),
         border: const OutlineInputBorder(),
         suffixIcon: caricamento
             ? const Padding(
@@ -564,7 +570,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
             : null,
       ),
       items: <DropdownMenuItem<String?>>[
-        if (campo.nullable)
+        if (!campo.obbligatorio)
           const DropdownMenuItem<String?>(value: null, child: Text('—')),
         ...voci.map(
           (opzione) => DropdownMenuItem<String?>(
@@ -574,7 +580,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
         ),
       ],
       validator: (value) =>
-          !campo.nullable && value == null ? 'Campo obbligatorio' : null,
+          campo.obbligatorio && value == null ? 'Campo obbligatorio' : null,
       onChanged: caricamento || !_modificabile(campo)
           ? null
           : (value) => _valori[campo.nome] = value,
@@ -732,7 +738,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
 
   String? _validaTesto(CampoDatabase campo, String? value) {
     final testo = value?.trim() ?? '';
-    if (!campo.nullable && testo.isEmpty) return 'Campo obbligatorio';
+    if (campo.obbligatorio && testo.isEmpty) return 'Campo obbligatorio';
     if (testo.isEmpty) return null;
     if (campo.tipo == TipoCampoDinamico.numeroIntero &&
         int.tryParse(testo) == null) {
@@ -770,10 +776,12 @@ class _CampoData extends StatelessWidget {
   Widget build(BuildContext context) => FormField<DateTime>(
     initialValue: valore,
     validator: (value) =>
-        !campo.nullable && value == null ? 'Campo obbligatorio' : null,
+        campo.obbligatorio && value == null ? 'Campo obbligatorio' : null,
     builder: (state) => InputDecorator(
       decoration: InputDecoration(
-        labelText: campo.etichetta,
+        labelText: campo.obbligatorio && onChanged != null
+            ? '${campo.etichetta} *'
+            : campo.etichetta,
         border: const OutlineInputBorder(),
         errorText: state.errorText,
       ),

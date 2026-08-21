@@ -152,6 +152,13 @@ abstract final class AppMenuController {
       sezione: MenuSezione.gestione,
       ruoli: _amministratori,
     ),
+    VoceMenu(
+      titolo: 'Questionari',
+      icona: Icons.quiz_outlined,
+      percorso: '/gestione/questionari',
+      sezione: MenuSezione.gestione,
+      ruoli: _amministratori,
+    ),
   ];
 
   static List<VoceMenu> vociPerRuolo(AppRole ruolo) {

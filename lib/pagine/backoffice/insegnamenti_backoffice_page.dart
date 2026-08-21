@@ -308,6 +308,17 @@ class _InsegnamentiBackofficePageState
                   icon: const Icon(Icons.groups_outlined),
                   label: const Text('Mentori / senior'),
                 ),
+                if (m['stato']?.toString().trim().toLowerCase() !=
+                    'completato') ...[
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: controller.caricamento
+                        ? null
+                        : () => _eliminaMentoraggio(m),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Elimina mentoraggio'),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 8),
@@ -332,6 +343,62 @@ class _InsegnamentiBackofficePageState
         ),
       ),
     );
+  }
+
+  Future<void> _eliminaMentoraggio(
+    Map<String, dynamic> mentoraggio,
+  ) async {
+    final id = mentoraggio['id']?.toString();
+
+    if (id == null || id.isEmpty) {
+      _messaggio('ID mentoraggio non disponibile.');
+      return;
+    }
+
+    final stato =
+        mentoraggio['stato']?.toString().trim().toLowerCase() ?? '';
+
+    if (stato == 'completato') {
+      _messaggio(
+        'Un mentoraggio completato non può essere eliminato.',
+      );
+      return;
+    }
+
+    final anno =
+        mentoraggio['anno_accademico']?.toString() ?? '—';
+
+    final conferma = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Elimina mentoraggio'),
+            content: Text(
+              'Vuoi eliminare definitivamente il mentoraggio '
+              'dell’anno accademico $anno?\n\n'
+              'Questa operazione non elimina l’insegnamento.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Elimina'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!conferma) return;
+
+    final errore =
+        await controller.eliminaMentoraggioBackoffice(id);
+
+    if (!mounted) return;
+    _messaggio(errore);
   }
 
   Future<void> _nuovoInsegnamento() async {

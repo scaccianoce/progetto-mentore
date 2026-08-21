@@ -10,6 +10,8 @@ import 'pagine/backoffice/database_backoffice_page.dart';
 import 'pagine/backoffice/insegnamenti_backoffice_page.dart';
 import 'pagine/backoffice/notifiche_backoffice_page.dart';
 import 'pagine/backoffice/partecipanti_backoffice_page.dart';
+import 'pagine/backoffice/questionari_backoffice_page.dart';
+import 'pagine/backoffice/questionari_controller.dart';
 import 'pagine/contatti/contatti_page.dart';
 import 'pagine/eventi/eventi_page.dart';
 import 'pagine/house_of_mentore/house_of_mentore_page.dart';
@@ -120,6 +122,17 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
         GoRoute(
           path: '/gestione/controllo-partecipanti',
           builder: (_, _) => const ControlloPartecipantiBackofficePage(),
+        ),
+        GoRoute(
+          path: '/gestione/questionari',
+          builder: (_, _) {
+            final controller =
+                QuestionariController(sessione);
+            controller.carica();
+            return QuestionariBackofficePage(
+              controller: controller,
+            );
+          },
         ),
         GoRoute(
           path: '/gestione/notifiche',

@@ -44,6 +44,7 @@ class CampoDatabase {
     this.solaLettura = false,
     this.visibilePartecipante = true,
     this.modificabilePartecipante = true,
+    this.obbligatorioPersonalizzato,
   });
 
   final String nome;
@@ -63,6 +64,10 @@ class CampoDatabase {
   final bool solaLettura;
   final bool visibilePartecipante;
   final bool modificabilePartecipante;
+  final bool? obbligatorioPersonalizzato;
+
+  bool get obbligatorio =>
+      obbligatorioPersonalizzato ?? !nullable;
 
   String get etichetta => etichettaPersonalizzata ?? _titoloDaNome(nome);
 
@@ -83,6 +88,7 @@ class CampoDatabase {
     bool? solaLettura,
     bool? visibilePartecipante,
     bool? modificabilePartecipante,
+    bool? obbligatorioPersonalizzato,
   }) => CampoDatabase(
     nome: nome,
     tipoDatabase: tipoDatabase,
@@ -103,6 +109,8 @@ class CampoDatabase {
     visibilePartecipante: visibilePartecipante ?? this.visibilePartecipante,
     modificabilePartecipante:
         modificabilePartecipante ?? this.modificabilePartecipante,
+    obbligatorioPersonalizzato:
+        obbligatorioPersonalizzato ?? this.obbligatorioPersonalizzato,
   );
 
   factory CampoDatabase.fromJson(
@@ -324,6 +332,7 @@ class PersonalizzazioneCampo {
     this.solaLettura,
     this.visibilePartecipante,
     this.modificabilePartecipante,
+    this.obbligatorio,
   });
 
   final TipoCampoDinamico? tipo;
@@ -333,6 +342,7 @@ class PersonalizzazioneCampo {
   final bool? solaLettura;
   final bool? visibilePartecipante;
   final bool? modificabilePartecipante;
+  final bool? obbligatorio;
 }
 
 class ConfigurazionePaginaDinamica {
@@ -414,6 +424,7 @@ abstract final class ConfigurazioneMaschere {
         solaLettura: modifica.solaLettura,
         visibilePartecipante: modifica.visibilePartecipante,
         modificabilePartecipante: modifica.modificabilePartecipante,
+        obbligatorioPersonalizzato: modifica.obbligatorio,
       );
     }
 

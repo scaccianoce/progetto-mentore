@@ -767,6 +767,40 @@ Future<String?> creaMentoraggioBackoffice(
             .eq('id', mentoraggioId);
       });
 
+
+  Future<String?> eliminaMentoraggioBackoffice(
+    String mentoraggioId,
+  ) =>
+      _esegui(() async {
+        if (!puoAmministrare) {
+          throw const AppException('Operazione non autorizzata.');
+        }
+
+        final riga = await SupabaseConfig.client
+            .from('mentoraggi')
+            .select('id, stato, anno_accademico')
+            .eq('id', mentoraggioId)
+            .maybeSingle();
+
+        if (riga == null) {
+          throw const AppException('Mentoraggio non trovato.');
+        }
+
+        final stato =
+            riga['stato']?.toString().trim().toLowerCase() ?? '';
+
+        if (stato == 'completato') {
+          throw const AppException(
+            'Un mentoraggio completato non può essere eliminato.',
+          );
+        }
+
+        await SupabaseConfig.client
+            .from('mentoraggi')
+            .delete()
+            .eq('id', mentoraggioId);
+      });
+
   Future<String?> aggiungiAssegnazione(
     String mentoraggioId,
     String mentoreId,

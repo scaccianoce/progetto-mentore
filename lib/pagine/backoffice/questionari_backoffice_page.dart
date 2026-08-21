@@ -126,21 +126,51 @@ class _QuestionariBackofficePageState
               alignment: Alignment.centerLeft,
               child: Text('Nessuna domanda inserita.'),
             ),
-          for (final domanda in domande)
+          for (var indice = 0; indice < domande.length; indice++)
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
-                child: Text(domanda['ordine'].toString()),
+                child: Text('${indice + 1}'),
               ),
-              title: Text(domanda['testo']?.toString() ?? ''),
+              title: Text(domande[indice]['testo']?.toString() ?? ''),
               subtitle: Text(
-                '${domanda['tipo'] ?? ''}'
-                '${domanda['obbligatoria'] == true ? ' · obbligatoria' : ''}',
+                '${domande[indice]['tipo'] ?? ''}'
+                '${domande[indice]['obbligatoria'] == true ? ' · obbligatoria' : ''}',
               ),
-              trailing: IconButton(
-                tooltip: 'Elimina domanda',
-                onPressed: () => _eliminaDomanda(context, domanda),
-                icon: const Icon(Icons.delete_outline),
+              trailing: Wrap(
+                spacing: 2,
+                children: [
+                  IconButton(
+                    tooltip: 'Sposta su',
+                    onPressed: indice == 0
+                        ? null
+                        : () => _spostaDomanda(
+                              context,
+                              templateId: id,
+                              domanda: domande[indice],
+                              versoAlto: true,
+                            ),
+                    icon: const Icon(Icons.arrow_upward),
+                  ),
+                  IconButton(
+                    tooltip: 'Sposta giù',
+                    onPressed: indice == domande.length - 1
+                        ? null
+                        : () => _spostaDomanda(
+                              context,
+                              templateId: id,
+                              domanda: domande[indice],
+                              versoAlto: false,
+                            ),
+                    icon: const Icon(Icons.arrow_downward),
+                  ),
+                  IconButton(
+                    tooltip: 'Elimina domanda',
+                    onPressed: () =>
+                        _eliminaDomanda(context, domande[indice]),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                ],
               ),
             ),
         ],
@@ -415,6 +445,22 @@ class _QuestionariBackofficePageState
 
     testo.dispose();
     opzioni.dispose();
+
+    if (!context.mounted) return;
+    _messaggio(context, errore);
+  }
+
+  Future<void> _spostaDomanda(
+    BuildContext context, {
+    required String templateId,
+    required Map<String, dynamic> domanda,
+    required bool versoAlto,
+  }) async {
+    final errore = await controller.spostaDomanda(
+      templateId: templateId,
+      domandaId: domanda['id'].toString(),
+      versoAlto: versoAlto,
+    );
 
     if (!context.mounted) return;
     _messaggio(context, errore);

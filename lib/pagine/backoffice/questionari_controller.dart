@@ -88,7 +88,7 @@ class QuestionariController extends ChangeNotifier {
 
   Map<String, dynamic>? questionarioMentoraggio(String mentoraggioId) {
     for (final q in questionari) {
-      if (q['provider']?.toString() == 'google_form' &&
+      if (q['provider']?.toString() == 'pubblico' &&
           q['mentoraggio_id']?.toString() == mentoraggioId) {
         return q;
       }
@@ -173,6 +173,95 @@ class QuestionariController extends ChangeNotifier {
             .eq('id', domandaId);
       });
 
+
+  Future<String?> spostaDomanda({
+    required String templateId,
+    required String domandaId,
+    required bool versoAlto,
+  }) =>
+      _esegui(() async {
+        if (!puoGestire) {
+          throw const AppException('Operazione non autorizzata.');
+        }
+
+        final righe = await SupabaseConfig.client
+            .from('questionari_domande')
+            .select('id, ordine')
+            .eq('template_id', templateId)
+            .order('ordine');
+
+        final elenco = (righe as List)
+            .map((riga) => Map<String, dynamic>.from(riga as Map))
+            .toList(growable: false);
+
+        final indice = elenco.indexWhere(
+          (riga) => riga['id']?.toString() == domandaId,
+        );
+
+        if (indice < 0) {
+          throw const AppException('Domanda non trovata.');
+        }
+
+        final indiceDestinazione = versoAlto ? indice - 1 : indice + 1;
+
+        if (indiceDestinazione < 0 ||
+            indiceDestinazione >= elenco.length) {
+          return;
+        }
+
+        final corrente = elenco[indice];
+        final destinazione = elenco[indiceDestinazione];
+
+        final ordineCorrente =
+            int.tryParse(corrente['ordine']?.toString() ?? '');
+        final ordineDestinazione =
+            int.tryParse(destinazione['ordine']?.toString() ?? '');
+
+        if (ordineCorrente == null || ordineDestinazione == null) {
+          throw const AppException(
+            'Impossibile determinare l’ordine delle domande.',
+          );
+        }
+
+        final ordineMinimo = elenco
+            .map(
+              (riga) =>
+                  int.tryParse(riga['ordine']?.toString() ?? '') ?? 0,
+            )
+            .reduce((a, b) => a < b ? a : b);
+
+        final ordineTemporaneo = ordineMinimo - 1000;
+
+        await SupabaseConfig.client
+            .from('questionari_domande')
+            .update({'ordine': ordineTemporaneo})
+            .eq('id', domandaId);
+
+        try {
+          await SupabaseConfig.client
+              .from('questionari_domande')
+              .update({'ordine': ordineCorrente})
+              .eq('id', destinazione['id']);
+
+          await SupabaseConfig.client
+              .from('questionari_domande')
+              .update({'ordine': ordineDestinazione})
+              .eq('id', domandaId);
+        } catch (_) {
+          await SupabaseConfig.client
+              .from('questionari_domande')
+              .update({'ordine': ordineDestinazione})
+              .eq('id', destinazione['id']);
+
+          await SupabaseConfig.client
+              .from('questionari_domande')
+              .update({'ordine': ordineCorrente})
+              .eq('id', domandaId);
+
+          rethrow;
+        }
+      });
+
   Future<String?> creaQuestionarioEvento({
     required String eventoId,
     required String templateId,
@@ -193,45 +282,62 @@ class QuestionariController extends ChangeNotifier {
         });
       });
 
+  /// Genera una sola istanza pubblica per il mentoraggio.
+  ///
+  /// Il template è già predisposto da owner/organizer. Il mentore non può
+  /// modificarlo: può soltanto generare il questionario e condividere URL/QR.
   Future<String?> creaQuestionarioMentoraggio({
     required String mentoraggioId,
     required String templateId,
     required String titolo,
-    String? urlGoogleForm,
   }) =>
       _esegui(() async {
-        final url = urlGoogleForm?.trim();
+        final giaEsistente = await SupabaseConfig.client
+            .from('questionari')
+            .select('id')
+            .eq('provider', 'pubblico')
+            .eq('mentoraggio_id', mentoraggioId)
+            .maybeSingle();
 
-        await SupabaseConfig.client.from('questionari').insert({
-          'template_id': templateId,
-          'titolo': titolo.trim(),
-          'provider': 'google_form',
-          'mentoraggio_id': mentoraggioId,
-          'url_esterno': url == null || url.isEmpty ? null : url,
-          'aperto': true,
-          'created_by': SupabaseConfig.client.auth.currentUser?.id,
-        });
-      });
-
-  Future<String?> salvaUrlGoogleForm(
-    String questionarioId,
-    String url,
-  ) =>
-      _esegui(() async {
-        final valore = url.trim();
-
-        if (valore.isEmpty ||
-            !(valore.startsWith('https://') || valore.startsWith('http://'))) {
+        if (giaEsistente != null) {
           throw const AppException(
-            'Inserire un URL valido del Google Form.',
+            'Il questionario per questo mentoraggio è già stato generato.',
           );
         }
 
         await SupabaseConfig.client
             .from('questionari')
-            .update({'url_esterno': valore})
-            .eq('id', questionarioId);
+            .insert({
+              'template_id': templateId,
+              'titolo': titolo.trim(),
+              'provider': 'pubblico',
+              'mentoraggio_id': mentoraggioId,
+              'aperto': true,
+              'created_by': SupabaseConfig.client.auth.currentUser?.id,
+            })
+            .select('id, token_pubblico')
+            .single();
       });
+
+  String? urlQuestionarioPubblico(
+    Map<String, dynamic> questionario,
+  ) {
+    final token =
+        questionario['token_pubblico']?.toString().trim();
+
+    if (token == null || token.isEmpty) {
+      return null;
+    }
+
+    const configurato =
+        String.fromEnvironment('PUBLIC_APP_URL');
+
+    final base = configurato.trim().isNotEmpty
+        ? configurato.trim().replaceFirst(RegExp(r'/$'), '')
+        : Uri.base.origin;
+
+    return '$base/q/$token';
+  }
 
   Future<String?> eliminaQuestionario(String id) =>
       _esegui(() async {
