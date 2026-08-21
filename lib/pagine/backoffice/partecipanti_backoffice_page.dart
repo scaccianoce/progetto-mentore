@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
@@ -52,6 +53,20 @@ class _PartecipantiBackofficePageState
                   icon: const Icon(Icons.person_add_alt_1),
                   label: const Text('Nuovo partecipante'),
                 ),
+                if (controller.soloOwner) ...[
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: controller.caricamento
+                        ? null
+                        : () => _importaPartecipanti(context),
+                    icon: const Icon(
+                      Icons.upload_file_outlined,
+                    ),
+                    label: const Text(
+                      'Importa partecipanti',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -80,7 +95,48 @@ class _PartecipantiBackofficePageState
                           : Icons.person_outline,
                     ),
                     title: Text('${p['cognome'] ?? ''} ${p['nome'] ?? ''}'.trim()),
-                    subtitle: Text('${p['email_unipa'] ?? ''}${ruolo == null ? '' : ' · $ruolo'}'),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${p['email_unipa'] ?? ''}'
+                          '${ruolo == null ? '' : ' · $ruolo'}',
+                        ),
+                        if (controller.annoPreparazione != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              'Partecipazione ${controller.annoPreparazione}: '
+                              '${_etichettaStatoPartecipazione(controller.statoPartecipazione(id, controller.annoPreparazione!))}',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        if (controller.annoGestioneInsegnamenti != null)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Switch.adaptive(
+                                value: controller.gestioneInsegnamentiAttiva(id),
+                                onChanged: controller.caricamento
+                                    ? null
+                                    : (abilita) =>
+                                        _impostaGestioneInsegnamenti(
+                                          context,
+                                          id,
+                                          abilita,
+                                        ),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Inserisci/modifica insegnamenti · '
+                                  '${controller.annoGestioneInsegnamenti}',
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                     trailing: IconButton(
                       tooltip: 'Modifica / elimina',
                       onPressed: () => _azioni(context, p, riservato),
@@ -93,6 +149,35 @@ class _PartecipantiBackofficePageState
                       _SezioneDati(
                         titolo: 'Anagrafica riservata',
                         dati: riservato ?? const <String, dynamic>{},
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _modificaAnagrafica(context, p),
+                              icon: const Icon(Icons.badge_outlined),
+                              label: const Text('Modifica anagrafica'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _modificaRiservati(
+                                context,
+                                p,
+                                riservato,
+                              ),
+                              icon: const Icon(Icons.lock_outline),
+                              label: const Text('Modifica dati riservati'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => _apriInsegnamenti(context, p),
+                              icon: const Icon(Icons.menu_book_outlined),
+                              label: const Text('Insegnamenti'),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Align(
@@ -110,6 +195,21 @@ class _PartecipantiBackofficePageState
           ),
         ],
       );
+
+
+  void _apriInsegnamenti(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+  ) {
+    final userId = partecipante['user_id']?.toString();
+    if (userId == null || userId.isEmpty) return;
+    context.go(
+      Uri(
+        path: '/gestione/insegnamenti',
+        queryParameters: <String, String>{'docente': userId},
+      ).toString(),
+    );
+  }
 
   Future<void> _nuovo(BuildContext context) async {
     final valori = await mostraMascheraDinamica(
@@ -139,6 +239,71 @@ class _PartecipantiBackofficePageState
     _mostraErrore(context, errore);
   }
 
+  Future<void> _importaPartecipanti(
+  BuildContext context,
+  ) async {
+    final anno = '2026-27';
+
+    final conferma =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Importa partecipanti',
+        ),
+        content: Text(
+          'Verranno importate tutte le righe '
+          'non ancora elaborate presenti in '
+          'import_partecipanti e associate '
+          'all’anno accademico $anno.\n\n'
+          'Continuare?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pop(
+              context,
+              false,
+            ),
+            child: const Text(
+              'Annulla',
+            ),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(
+              context,
+              true,
+            ),
+            child: const Text(
+              'Importa',
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (conferma != true) return;
+
+    final errore =
+        await controller
+            .importaPartecipanti(
+      anno,
+    );
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      SnackBar(
+        content: Text(
+          errore ??
+              'Importazione completata.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _azioni(
     BuildContext context,
     Map<String, dynamic> partecipante,
@@ -159,6 +324,25 @@ class _PartecipantiBackofficePageState
               title: const Text('Dati riservati e ruolo'),
               onTap: () => Navigator.pop(context, 'riservati'),
             ),
+            if (controller.annoPreparazione != null)
+              ListTile(
+                leading: const Icon(Icons.how_to_reg_outlined),
+                title: const Text('Partecipazione prossimo anno'),
+                subtitle: Text('Anno ${controller.annoPreparazione}'),
+                onTap: () => Navigator.pop(context, 'partecipazione_annuale'),
+              ),
+            ListTile(
+              leading: const Icon(Icons.school_outlined),
+              title: const Text('Abilitazioni insegnamento'),
+              subtitle: Text(
+                controller.annoGestioneInsegnamenti == null
+                    ? 'Nessun anno attivo o in preparazione'
+                    : 'Anno ${controller.annoGestioneInsegnamenti}',
+              ),
+              onTap: controller.annoGestioneInsegnamenti == null
+                  ? null
+                  : () => Navigator.pop(context, 'abilitazioni_insegnamento'),
+            ),
             if (controller.soloOwner ||
                 controller.ruoli[partecipante['user_id']?.toString()] ==
                     'participant')
@@ -167,41 +351,31 @@ class _PartecipantiBackofficePageState
                 title: const Text('Reimposta password'),
                 onTap: () => Navigator.pop(context, 'password'),
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Elimina partecipante'),
-              onTap: () => Navigator.pop(context, 'elimina'),
-            ),
+            if (controller.soloOwner)
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Elimina partecipante'),
+                onTap: () => Navigator.pop(context, 'elimina'),
+              ),
           ],
         ),
       ),
     );
     if (!context.mounted || scelta == null) return;
     if (scelta == 'anagrafica') {
-      final valori = await mostraMascheraDinamica(
-        context: context,
-        configurazione: const ConfigurazionePaginaDinamica(
-          tabella: 'anagrafica',
-          campi: <String, PersonalizzazioneCampo>{
-            'user_id': PersonalizzazioneCampo(solaLettura: true),
-          },
-        ),
-        partecipante: false,
-        valoriIniziali: partecipante,
-        titolo: 'Modifica partecipante',
-      );
-      if (valori == null) return;
-      final errore = await controller.salvaAnagrafica(
-        partecipante['user_id'].toString(),
-        valori,
-        originali: partecipante,
-      );
-      if (!context.mounted) return;
-      _mostraErrore(context, errore);
+      await _modificaAnagrafica(context, partecipante);
       return;
     }
     if (scelta == 'riservati') {
       await _modificaRiservati(context, partecipante, riservato);
+      return;
+    }
+    if (scelta == 'partecipazione_annuale') {
+      await _modificaPartecipazioneAnnuale(context, partecipante);
+      return;
+    }
+    if (scelta == 'abilitazioni_insegnamento') {
+      await _modificaAbilitazioniInsegnamento(context, partecipante);
       return;
     }
     if (scelta == 'password') {
@@ -235,6 +409,210 @@ class _PartecipantiBackofficePageState
       if (!context.mounted) return;
       _mostraErrore(context, errore);
     }
+  }
+
+  Future<void> _modificaAnagrafica(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+  ) async {
+    final valori = await mostraMascheraDinamica(
+      context: context,
+      configurazione: const ConfigurazionePaginaDinamica(
+        tabella: 'anagrafica',
+        campi: <String, PersonalizzazioneCampo>{
+          'user_id': PersonalizzazioneCampo(solaLettura: true),
+        },
+      ),
+      partecipante: false,
+      valoriIniziali: partecipante,
+      titolo: 'Modifica partecipante',
+    );
+    if (valori == null) return;
+
+    final errore = await controller.salvaAnagrafica(
+      partecipante['user_id'].toString(),
+      valori,
+      originali: partecipante,
+    );
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+
+  Future<void> _impostaGestioneInsegnamenti(
+    BuildContext context,
+    String userId,
+    bool abilita,
+  ) async {
+    final errore = await controller.impostaGestioneInsegnamentiCorrente(
+      userId,
+      abilita,
+    );
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+
+  Future<void> _modificaAbilitazioniInsegnamento(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+  ) async {
+    final anno = controller.annoGestioneInsegnamenti;
+    final userId = partecipante['user_id']?.toString();
+    if (anno == null || userId == null || userId.isEmpty) return;
+
+    var puoSelezionare = controller.abilitazioneAttiva(
+      userId,
+      'insegnamento_selezione',
+      anno,
+    );
+    var gestioneInsegnamenti = controller.gestioneInsegnamentiAttiva(userId);
+    var nonRichiesto = controller.abilitazioneAttiva(
+      userId,
+      'insegnamento_non_richiesto',
+      anno,
+    );
+
+    final salva = await showDialog<bool>(
+          context: context,
+          builder: (context) => StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: Text(
+                'Abilitazioni insegnamento · $anno',
+              ),
+              content: SizedBox(
+                width: 560,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Può scegliere un insegnamento precedente'),
+                      value: puoSelezionare,
+                      onChanged: nonRichiesto
+                          ? null
+                          : (v) => setDialogState(() => puoSelezionare = v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Può inserire e modificare insegnamenti',
+                      ),
+                      subtitle: Text(
+                        'Unica abilitazione valida per l’anno accademico $anno.',
+                      ),
+                      value: gestioneInsegnamenti,
+                      onChanged: nonRichiesto
+                          ? null
+                          : (v) => setDialogState(
+                                () => gestioneInsegnamenti = v,
+                              ),
+                    ),
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Nessun insegnamento richiesto'),
+                      subtitle: const Text(
+                        'Se attivo, scelta e creazione vengono disabilitate.',
+                      ),
+                      value: nonRichiesto,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          nonRichiesto = v;
+                          if (v) {
+                            puoSelezionare = false;
+                            gestioneInsegnamenti = false;
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Annulla'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Salva'),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        false;
+
+    if (!salva) return;
+
+    final errore = await controller.impostaAbilitazioniInsegnamento(
+      userId,
+      anno,
+      <String, bool>{
+        'insegnamento_selezione': puoSelezionare,
+        'insegnamento_creazione': gestioneInsegnamenti,
+        'insegnamento_modifica': gestioneInsegnamenti,
+        'insegnamento_non_richiesto': nonRichiesto,
+      },
+    );
+
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
+  }
+
+  Future<void> _modificaPartecipazioneAnnuale(
+    BuildContext context,
+    Map<String, dynamic> partecipante,
+  ) async {
+    final anno = controller.annoPreparazione;
+    final userId = partecipante['user_id']?.toString();
+    if (anno == null || userId == null || userId.isEmpty) return;
+
+    var stato = controller.statoPartecipazione(userId, anno);
+    if (stato == 'non_presente') stato = 'da_contattare';
+
+    final nuovoStato = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Partecipazione · $anno'),
+        content: SizedBox(
+          width: 460,
+          child: DropdownButtonFormField<String>(
+            initialValue: stato,
+            decoration: const InputDecoration(
+              labelText: 'Stato partecipazione',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'da_contattare', child: Text('Da contattare')),
+              DropdownMenuItem(value: 'confermato', child: Text('Confermato')),
+              DropdownMenuItem(value: 'rinuncia', child: Text('Non partecipa')),
+              DropdownMenuItem(value: 'nuovo', child: Text('Nuovo partecipante')),
+              DropdownMenuItem(value: 'sospeso', child: Text('Sospeso')),
+            ],
+            onChanged: (value) => stato = value ?? stato,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, stato),
+            child: const Text('Salva'),
+          ),
+        ],
+      ),
+    );
+
+    if (nuovoStato == null) return;
+    final errore = await controller.impostaPartecipazioneAnnuale(
+      userId,
+      anno,
+      nuovoStato,
+    );
+    if (!context.mounted) return;
+    _mostraErrore(context, errore);
   }
 
   Future<void> _reimpostaPassword(
@@ -447,6 +825,15 @@ class _SezioneDati extends StatelessWidget {
         ],
       );
 }
+
+String _etichettaStatoPartecipazione(String stato) => switch (stato) {
+  'da_contattare' => 'da confermare',
+  'confermato' => 'confermato',
+  'rinuncia' => 'non partecipa',
+  'nuovo' => 'nuovo',
+  'sospeso' => 'sospeso',
+  _ => 'non impostata',
+};
 
 String _etichetta(String nome) {
   if (nome.isEmpty) return nome;

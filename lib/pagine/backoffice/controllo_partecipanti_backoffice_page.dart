@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../supabase_config.dart';
+import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../dinamico/maschera_dinamica_widget.dart';
+import 'backoffice_dati_anno.dart';
 
 /// Controllo operativo per anno accademico costruito direttamente dalle
 /// tabelle reali del database, senza view di riepilogo.
@@ -55,60 +59,23 @@ class _ControlloPartecipantiBackofficePageState
   Future<void> _carica() async {
     final anno = _anno;
     if (anno == null) return;
+
     setState(() {
       _caricamento = true;
       _errore = null;
     });
 
     try {
-      final db = SupabaseConfig.client;
-      final insegnamenti = _mappe(
-        await db.from('insegnamenti').select().eq('anno_accademico', anno),
-      );
-      final insegnamentoIds = _ids(insegnamenti, 'id');
-      final mentoraggi = insegnamentoIds.isEmpty
-          ? <Map<String, dynamic>>[]
-          : _mappe(
-              await db
-                  .from('mentoraggi')
-                  .select()
-                  .inFilter('insegnamento_id', insegnamentoIds),
-            );
-      final mentoraggioIds = _ids(mentoraggi, 'id');
-      final assegnazioni = mentoraggioIds.isEmpty
-          ? <Map<String, dynamic>>[]
-          : _mappe(
-              await db
-                  .from('mentoraggio_mentori')
-                  .select()
-                  .inFilter('mentoraggio_id', mentoraggioIds),
-            );
+      final dati = await BackofficeDatiAnno.carica(anno);
 
-      final eventi = _mappe(
-        await db.from('eventi').select().eq('anno_accademico', anno),
-      );
-      final eventoIds = _ids(eventi, 'id');
-      final partecipazioniEventi = eventoIds.isEmpty
-          ? <Map<String, dynamic>>[]
-          : _mappe(
-              await db
-                  .from('partecipazioni_eventi')
-                  .select()
-                  .inFilter('evento_id', eventoIds),
-            );
-
-      final hom = _mappe(
-        await db.from('house_of_mentore').select().eq('anno_accademico', anno),
-      );
-      final homIds = _ids(hom, 'id');
-      final partecipazioniHom = homIds.isEmpty
-          ? <Map<String, dynamic>>[]
-          : _mappe(
-              await db
-                  .from('partecipazioni_house_of_mentore')
-                  .select()
-                  .inFilter('evento_id', homIds),
-            );
+      final mentoraggi = dati.mentoraggi;
+      final insegnamenti = dati.insegnamenti;
+      final assegnazioni = dati.assegnazioni;
+      final eventi = dati.eventi;
+      final partecipazioniEventi = dati.partecipazioniEventi;
+      final hom = dati.houseOfMentore;
+      final partecipazioniHom = dati.partecipazioniHouseOfMentore;
+      final anagrafiche = dati.anagrafiche;
 
       final insegnamentiPerId = <String, Map<String, dynamic>>{
         for (final r in insegnamenti) r['id'].toString(): r,
@@ -119,36 +86,12 @@ class _ControlloPartecipantiBackofficePageState
       final homPerId = <String, Map<String, dynamic>>{
         for (final r in hom) r['id'].toString(): r,
       };
-
-      final partecipanteIds = <String>{};
-      for (final m in mentoraggi) {
-        final ins = insegnamentiPerId[m['insegnamento_id']?.toString()];
-        final id = ins?['docente_id']?.toString();
-        if (_valido(id)) partecipanteIds.add(id!);
-      }
-      for (final a in assegnazioni) {
-        final id = a['mentore_id']?.toString();
-        if (_valido(id)) partecipanteIds.add(id!);
-      }
-      for (final p in partecipazioniEventi) {
-        final id = p['partecipante_id']?.toString();
-        if (_valido(id)) partecipanteIds.add(id!);
-      }
-      for (final p in partecipazioniHom) {
-        final id = p['partecipante_id']?.toString();
-        if (_valido(id)) partecipanteIds.add(id!);
-      }
-
-      final anagrafiche = partecipanteIds.isEmpty
-          ? <Map<String, dynamic>>[]
-          : _mappe(
-              await db
-                  .from('anagrafica')
-                  .select()
-                  .inFilter('user_id', partecipanteIds.toList()),
-            );
       final persone = <String, Map<String, dynamic>>{
         for (final p in anagrafiche) p['user_id'].toString(): p,
+      };
+
+      final partecipanteIds = <String>{
+        ...persone.keys,
       };
 
       String nomePersona(String? id) {
@@ -161,22 +104,31 @@ class _ControlloPartecipantiBackofficePageState
       }
 
       final risultato = <_PartecipanteAnno>[];
+
       for (final partecipanteId in partecipanteIds) {
         final mentee = <_PercorsoMentee>[];
         final mentore = <_PercorsoMentore>[];
 
         for (final m in mentoraggi) {
-          final insegnamento = insegnamentiPerId[m['insegnamento_id']?.toString()];
+          final insegnamento =
+              insegnamentiPerId[m['insegnamento_id']?.toString()];
           if (insegnamento == null) continue;
+
           final assegnati = assegnazioni
-              .where((a) => a['mentoraggio_id']?.toString() == m['id']?.toString())
+              .where(
+                (a) =>
+                    a['mentoraggio_id']?.toString() ==
+                    m['id']?.toString(),
+              )
               .toList();
+
           final docenteId = insegnamento['docente_id']?.toString();
 
           if (docenteId == partecipanteId) {
             mentee.add(
               _PercorsoMentee(
                 insegnamento: _nomeInsegnamento(insegnamento),
+                insegnamentoRiga: insegnamento,
                 team: assegnati
                     .map(
                       (a) => _MembroTeam(
@@ -191,16 +143,23 @@ class _ControlloPartecipantiBackofficePageState
           }
 
           final miaAssegnazione = assegnati
-              .where((a) => a['mentore_id']?.toString() == partecipanteId)
+              .where(
+                (a) => a['mentore_id']?.toString() == partecipanteId,
+              )
               .firstOrNull;
+
           if (miaAssegnazione != null) {
             mentore.add(
               _PercorsoMentore(
                 insegnamento: _nomeInsegnamento(insegnamento),
+                insegnamentoRiga: insegnamento,
                 mentee: nomePersona(docenteId),
                 mioTipo: miaAssegnazione['tipo']?.toString() ?? '—',
                 altriTeam: assegnati
-                    .where((a) => a['mentore_id']?.toString() != partecipanteId)
+                    .where(
+                      (a) =>
+                          a['mentore_id']?.toString() != partecipanteId,
+                    )
                     .map(
                       (a) => _MembroTeam(
                         nome: nomePersona(a['mentore_id']?.toString()),
@@ -215,10 +174,13 @@ class _ControlloPartecipantiBackofficePageState
         }
 
         final partecipazioni = partecipazioniEventi
-            .where((p) => p['partecipante_id']?.toString() == partecipanteId)
+            .where(
+              (p) => p['partecipante_id']?.toString() == partecipanteId,
+            )
             .map(
               (p) => _PartecipazioneEvento(
-                titolo: eventiPerId[p['evento_id']?.toString()]?['titolo']
+                titolo:
+                    eventiPerId[p['evento_id']?.toString()]?['titolo']
                         ?.toString() ??
                     p['evento_id']?.toString() ??
                     '—',
@@ -228,10 +190,12 @@ class _ControlloPartecipantiBackofficePageState
             .toList();
 
         final house = partecipazioniHom
-            .where((p) => p['partecipante_id']?.toString() == partecipanteId)
+            .where(
+              (p) => p['partecipante_id']?.toString() == partecipanteId,
+            )
             .map(
-              (p) => homPerId[p['evento_id']?.toString()]?['titolo']
-                      ?.toString() ??
+              (p) =>
+                  homPerId[p['evento_id']?.toString()]?['titolo']?.toString() ??
                   p['evento_id']?.toString() ??
                   '—',
             )
@@ -239,7 +203,8 @@ class _ControlloPartecipantiBackofficePageState
 
         risultato.add(
           _PartecipanteAnno(
-            persona: persone[partecipanteId] ??
+            persona:
+                persone[partecipanteId] ??
                 <String, dynamic>{'user_id': partecipanteId},
             mentee: mentee,
             mentore: mentore,
@@ -250,8 +215,10 @@ class _ControlloPartecipantiBackofficePageState
       }
 
       risultato.sort((a, b) {
-        final cognomeA = a.persona['cognome']?.toString().toLowerCase() ?? '';
-        final cognomeB = b.persona['cognome']?.toString().toLowerCase() ?? '';
+        final cognomeA =
+            a.persona['cognome']?.toString().toLowerCase() ?? '';
+        final cognomeB =
+            b.persona['cognome']?.toString().toLowerCase() ?? '';
         final confronto = cognomeA.compareTo(cognomeB);
         if (confronto != 0) return confronto;
         final nomeA = a.persona['nome']?.toString().toLowerCase() ?? '';
@@ -264,7 +231,8 @@ class _ControlloPartecipantiBackofficePageState
     } catch (e) {
       if (!mounted) return;
       setState(
-        () => _errore = 'Impossibile costruire il controllo partecipanti.\n$e',
+        () => _errore =
+            'Impossibile costruire il controllo partecipanti.\n$e',
       );
     } finally {
       if (mounted) setState(() => _caricamento = false);
@@ -397,6 +365,28 @@ class _ControlloPartecipantiBackofficePageState
               ),
               Text('Mentori / senior: ${_team(p.team)}'),
               _statoMentoraggio(p.mentoraggio),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _modificaInsegnamento(p.insegnamentoRiga),
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: const Text('Modifica insegnamento'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _modificaMentoraggio(p.mentoraggio),
+                    icon: const Icon(Icons.edit_note_outlined),
+                    label: const Text('Modifica mentoraggio'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _gestisciTeamMentoraggio(p.mentoraggio),
+                    icon: const Icon(Icons.groups_outlined),
+                    label: const Text('Mentori / senior'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -416,6 +406,28 @@ class _ControlloPartecipantiBackofficePageState
               Text('Ruolo: ${p.mioTipo}'),
               Text('Co-mentore / senior: ${_team(p.altriTeam)}'),
               _statoMentoraggio(p.mentoraggio),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _modificaInsegnamento(p.insegnamentoRiga),
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: const Text('Modifica insegnamento'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _modificaMentoraggio(p.mentoraggio),
+                    icon: const Icon(Icons.edit_note_outlined),
+                    label: const Text('Modifica mentoraggio'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _gestisciTeamMentoraggio(p.mentoraggio),
+                    icon: const Icon(Icons.groups_outlined),
+                    label: const Text('Mentori / senior'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -423,22 +435,406 @@ class _ControlloPartecipantiBackofficePageState
 
   Widget _statoMentoraggio(Map<String, dynamic> m) => Padding(
         padding: const EdgeInsets.only(top: 8),
-        child: Wrap(
-          spacing: 14,
-          runSpacing: 4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Stato: ${m['stato'] ?? '—'}'),
-            Text('Visita 1: ${m['data_visita_1'] ?? '—'}'),
-            Text('Visita 2: ${m['data_visita_2'] ?? '—'}'),
-            if (m['data_visita_3'] != null)
-              Text('Visita 3: ${m['data_visita_3']}'),
-            if (m['data_visita_4'] != null)
-              Text('Visita 4: ${m['data_visita_4']}'),
-            Text('Focus group: ${m['data_focus_group'] ?? '—'}'),
-            Text('Incontro finale: ${m['data_incontro_finale'] ?? '—'}'),
+            Wrap(
+              spacing: 14,
+              runSpacing: 4,
+              children: [
+                Text('Stato: ${m['stato'] ?? '—'}'),
+                Text('Visita 1: ${m['data_visita_1'] ?? '—'}'),
+                Text('Visita 2: ${m['data_visita_2'] ?? '—'}'),
+                if (m['data_visita_3'] != null)
+                  Text('Visita 3: ${m['data_visita_3']}'),
+                if (m['data_visita_4'] != null)
+                  Text('Visita 4: ${m['data_visita_4']}'),
+                Text('Focus group: ${m['data_focus_group'] ?? '—'}'),
+                Text('Incontro finale: ${m['data_incontro_finale'] ?? '—'}'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                if ((m['scheda_sintesi_pdf_url']?.toString().trim() ?? '').isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => _apriPdf(m['scheda_sintesi_pdf_url'].toString()),
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    label: const Text('Apri PDF'),
+                  ),
+                OutlinedButton.icon(
+                  onPressed: () => _modificaPdfMentoraggio(m),
+                  icon: const Icon(Icons.link_outlined),
+                  label: const Text('Modifica link PDF'),
+                ),
+              ],
+            ),
           ],
         ),
       );
+
+  Future<void> _modificaInsegnamento(
+    Map<String, dynamic> insegnamento,
+  ) async {
+    final id = insegnamento['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    final valori = await mostraMascheraDinamica(
+      context: context,
+      configurazione: const ConfigurazionePaginaDinamica(
+        tabella: 'insegnamenti',
+      ),
+      valoriIniziali: insegnamento,
+      partecipante: false,
+      mostraCampiSolaLettura: true,
+      titolo: 'Modifica insegnamento',
+    );
+    if (valori == null) return;
+
+    try {
+      final dati = Map<String, dynamic>.from(valori)
+        ..remove('id')
+        ..remove('created_at')
+        ..remove('updated_at');
+      if (dati.isNotEmpty) {
+        await SupabaseConfig.client
+            .from('insegnamenti')
+            .update(dati)
+            .eq('id', id);
+      }
+      await _carica();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossibile modificare l’insegnamento: $e')),
+      );
+    }
+  }
+
+  Future<void> _modificaMentoraggio(
+    Map<String, dynamic> mentoraggio,
+  ) async {
+    final id = mentoraggio['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    final valori = await mostraMascheraDinamica(
+      context: context,
+      configurazione: const ConfigurazionePaginaDinamica(
+        tabella: 'mentoraggi',
+      ),
+      valoriIniziali: mentoraggio,
+      partecipante: false,
+      mostraCampiSolaLettura: true,
+      titolo: 'Modifica mentoraggio · ${mentoraggio['anno_accademico'] ?? ''}',
+    );
+    if (valori == null) return;
+
+    try {
+      final dati = Map<String, dynamic>.from(valori)
+        ..remove('id')
+        ..remove('created_at')
+        ..remove('updated_at');
+
+      await SupabaseConfig.client.rpc(
+        'mentoraggio_aggiorna_backoffice',
+        params: <String, dynamic>{
+          'p_mentoraggio_id': id,
+          'p_valori': dati,
+        },
+      );
+      await _carica();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossibile modificare il mentoraggio: $e')),
+      );
+    }
+  }
+
+  Future<void> _gestisciTeamMentoraggio(
+    Map<String, dynamic> mentoraggio,
+  ) async {
+    final mentoraggioId = mentoraggio['id']?.toString();
+    if (mentoraggioId == null || mentoraggioId.isEmpty) return;
+
+    try {
+      final db = SupabaseConfig.client;
+      final risultati = await Future.wait<dynamic>([
+        db
+            .from('mentoraggio_mentori')
+            .select()
+            .eq('mentoraggio_id', mentoraggioId),
+        db.from('anagrafica').select().order('email_unipa'),
+        db.from('anagrafica_riservata').select('user_id, attivo'),
+      ]);
+
+      final assegnazioni = (risultati[0] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final persone = (risultati[1] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      final attivi = <String, bool>{
+        for (final r in (risultati[2] as List))
+          (r as Map)['user_id'].toString(): r['attivo'] == true,
+      };
+
+      final personeAttive = persone
+          .where(
+            (p) => attivi[p['user_id']?.toString()] == true,
+          )
+          .toList();
+
+      final schema = await SupabaseConfig.caricaSchemaDatabase();
+      final tipi = schema
+              .tabella('mentoraggio_mentori')
+              ?.campo('tipo')
+              ?.valoriScelta ??
+          const <String>[];
+
+      if (!mounted) return;
+
+      String? nuovoUtente;
+      String? nuovoTipo = tipi.isEmpty ? null : tipi.first;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            String etichettaPersona(String? userId) {
+              final persona = persone
+                  .where((p) => p['user_id']?.toString() == userId)
+                  .firstOrNull;
+              if (persona == null) return userId ?? '—';
+              final email = persona['email_unipa']?.toString().trim() ?? '';
+              final nome =
+                  '${persona['cognome'] ?? ''} ${persona['nome'] ?? ''}'.trim();
+              if (email.isNotEmpty && nome.isNotEmpty) return '$email — $nome';
+              return email.isNotEmpty ? email : (nome.isNotEmpty ? nome : userId ?? '—');
+            }
+
+            return AlertDialog(
+              title: Text(
+                'Mentori / senior · ${mentoraggio['anno_accademico'] ?? ''}',
+              ),
+              content: SizedBox(
+                width: 720,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (assegnazioni.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: Text('Nessun mentore/senior associato.'),
+                        ),
+                      for (final assegnazione in List<Map<String, dynamic>>.from(
+                        assegnazioni,
+                      ))
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            etichettaPersona(
+                              assegnazione['mentore_id']?.toString(),
+                            ),
+                          ),
+                          subtitle: Text(
+                            assegnazione['tipo']?.toString() ?? '—',
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Rimuovi',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () async {
+                              try {
+                                await db
+                                    .from('mentoraggio_mentori')
+                                    .delete()
+                                    .eq('mentoraggio_id', mentoraggioId)
+                                    .eq(
+                                      'mentore_id',
+                                      assegnazione['mentore_id'],
+                                    )
+                                    .eq('tipo', assegnazione['tipo']);
+                                setDialogState(
+                                  () => assegnazioni.remove(assegnazione),
+                                );
+                              } catch (e) {
+                                if (!dialogContext.mounted) return;
+                                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Impossibile rimuovere l’assegnazione: $e',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      const Divider(),
+                      DropdownButtonFormField<String>(
+                        initialValue: nuovoUtente,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Partecipante',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [
+                          for (final persona in personeAttive)
+                            DropdownMenuItem<String>(
+                              value: persona['user_id']?.toString(),
+                              child: Text(
+                                etichettaPersona(
+                                  persona['user_id']?.toString(),
+                                ),
+                              ),
+                            ),
+                        ],
+                        onChanged: (v) => nuovoUtente = v,
+                      ),
+                      const SizedBox(height: 12),
+                      if (tipi.isNotEmpty)
+                        DropdownButtonFormField<String>(
+                          initialValue: nuovoTipo,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Ruolo nel mentoraggio',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            for (final tipo in tipi)
+                              DropdownMenuItem<String>(
+                                value: tipo,
+                                child: Text(tipo),
+                              ),
+                          ],
+                          onChanged: (v) => nuovoTipo = v,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Chiudi'),
+                ),
+                FilledButton.icon(
+                  onPressed: nuovoUtente == null || nuovoTipo == null
+                      ? null
+                      : () async {
+                          try {
+                            final riga = <String, dynamic>{
+                              'mentoraggio_id': mentoraggioId,
+                              'mentore_id': nuovoUtente,
+                              'tipo': nuovoTipo,
+                              'assegnato_il': DateTime.now()
+                                  .toIso8601String()
+                                  .split('T')
+                                  .first,
+                            };
+                            await db.from('mentoraggio_mentori').insert(riga);
+                            setDialogState(() {
+                              assegnazioni.add(riga);
+                              nuovoUtente = null;
+                            });
+                          } catch (e) {
+                            if (!dialogContext.mounted) return;
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Impossibile aggiungere l’assegnazione: $e',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Aggiungi'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      await _carica();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossibile gestire mentori/senior: $e')),
+      );
+    }
+  }
+
+  Future<void> _apriPdf(String valore) async {
+    final uri = Uri.tryParse(valore);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossibile aprire il PDF.')),
+      );
+    }
+  }
+
+  Future<void> _modificaPdfMentoraggio(Map<String, dynamic> mentoraggio) async {
+    final controller = TextEditingController(
+      text: mentoraggio['scheda_sintesi_pdf_url']?.toString() ?? '',
+    );
+    final salva = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Scheda di sintesi PDF'),
+            content: SizedBox(
+              width: 560,
+              child: TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'URL PDF',
+                  hintText: 'https://...',
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Salva'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!salva) {
+      controller.dispose();
+      return;
+    }
+    try {
+      await SupabaseConfig.client.rpc(
+        'mentoraggio_aggiorna_backoffice',
+        params: <String, dynamic>{
+          'p_mentoraggio_id': mentoraggio['id'],
+          'p_valori': <String, dynamic>{
+            'scheda_sintesi_pdf_url': controller.text.trim().isEmpty
+                ? null
+                : controller.text.trim(),
+          },
+        },
+      );
+      await _carica();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossibile salvare il link PDF: $e')),
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
 
   Widget _titolo(String testo) => Align(
         alignment: Alignment.centerLeft,
@@ -463,15 +859,6 @@ String _nomeInsegnamento(Map<String, dynamic> insegnamento) {
 bool _valido(String? valore) =>
     valore != null && valore.isNotEmpty && valore != 'null';
 
-List<String> _ids(List<Map<String, dynamic>> righe, String campo) => righe
-    .map((r) => r[campo]?.toString())
-    .whereType<String>()
-    .where((v) => v.isNotEmpty && v != 'null')
-    .toList();
-
-List<Map<String, dynamic>> _mappe(dynamic valore) =>
-    (valore as List).cast<Map<String, dynamic>>();
-
 class _MembroTeam {
   const _MembroTeam({required this.nome, required this.tipo});
   final String nome;
@@ -481,10 +868,12 @@ class _MembroTeam {
 class _PercorsoMentee {
   const _PercorsoMentee({
     required this.insegnamento,
+    required this.insegnamentoRiga,
     required this.team,
     required this.mentoraggio,
   });
   final String insegnamento;
+  final Map<String, dynamic> insegnamentoRiga;
   final List<_MembroTeam> team;
   final Map<String, dynamic> mentoraggio;
 }
@@ -492,12 +881,14 @@ class _PercorsoMentee {
 class _PercorsoMentore {
   const _PercorsoMentore({
     required this.insegnamento,
+    required this.insegnamentoRiga,
     required this.mentee,
     required this.mioTipo,
     required this.altriTeam,
     required this.mentoraggio,
   });
   final String insegnamento;
+  final Map<String, dynamic> insegnamentoRiga;
   final String mentee;
   final String mioTipo;
   final List<_MembroTeam> altriTeam;

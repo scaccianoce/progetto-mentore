@@ -69,7 +69,7 @@ abstract final class AppMenuController {
       ruoli: _tutti,
     ),
     VoceMenu(
-      titolo: 'Il mio insegnamento',
+      titolo: 'I miei insegnamenti',
       icona: Icons.menu_book_outlined,
       percorso: '/insegnamento',
       sezione: MenuSezione.personale,
@@ -121,6 +121,13 @@ abstract final class AppMenuController {
       titolo: 'Partecipanti',
       icona: Icons.people_outline,
       percorso: '/gestione/partecipanti',
+      sezione: MenuSezione.gestione,
+      ruoli: _amministratori,
+    ),
+    VoceMenu(
+      titolo: 'Insegnamenti',
+      icona: Icons.menu_book_outlined,
+      percorso: '/gestione/insegnamenti',
       sezione: MenuSezione.gestione,
       ruoli: _amministratori,
     ),

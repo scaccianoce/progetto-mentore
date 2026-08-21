@@ -7,6 +7,7 @@ import 'pagine/backoffice/anni_accademici_backoffice_page.dart';
 import 'pagine/backoffice/backoffice_controller_host.dart';
 import 'pagine/backoffice/controllo_partecipanti_backoffice_page.dart';
 import 'pagine/backoffice/database_backoffice_page.dart';
+import 'pagine/backoffice/insegnamenti_backoffice_page.dart';
 import 'pagine/backoffice/notifiche_backoffice_page.dart';
 import 'pagine/backoffice/partecipanti_backoffice_page.dart';
 import 'pagine/contatti/contatti_page.dart';
@@ -96,6 +97,16 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
             sessione: sessione,
             builder: (_, controller) =>
                 PartecipantiBackofficePage(controller: controller),
+          ),
+        ),
+        GoRoute(
+          path: '/gestione/insegnamenti',
+          builder: (_, state) => BackofficeControllerHost(
+            sessione: sessione,
+            builder: (_, controller) => InsegnamentiBackofficePage(
+              controller: controller,
+              docenteIdIniziale: state.uri.queryParameters['docente'],
+            ),
           ),
         ),
         GoRoute(

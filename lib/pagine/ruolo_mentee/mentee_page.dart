@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../app_exception.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
+import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
-import '../template/pagina_scheda_dinamica.dart';
+import '../template/componenti_pagina_dinamica.dart';
+import '../template/template_elenco_dettaglio_page.dart';
 import 'mentee_controller.dart';
 
 class MenteePage extends StatefulWidget {
@@ -15,21 +19,24 @@ class MenteePage extends StatefulWidget {
 }
 
 class _MenteePageState extends State<MenteePage> {
-  /// PERSONALIZZAZIONE MENTEE:
-  /// i tipi dei campi mentoraggio sono condivisi a livello di tabella; qui
-  /// resta solo il vincolo specifico del partecipante.
+  static const _campiMentee = <String>{
+    'data_inizio',
+    'data_fine',
+    'numero_studenti',
+    'sede',
+    'note',
+    'svolgimento',
+    'giorni_orari_lezioni',
+  };
+
   static const configurazione = ConfigurazionePaginaDinamica(
     tabella: 'mentoraggi',
+    prefissiNascostiPartecipante: <String>['osservazioni'],
+    campiModificabiliPartecipante: _campiMentee,
     campi: <String, PersonalizzazioneCampo>{
-      'osservazioni_aula': PersonalizzazioneCampo(
-        modificabilePartecipante: false,
-      ),
-      'osservazioni_focus_group': PersonalizzazioneCampo(
-        modificabilePartecipante: false,
-      ),
-      'scheda_sintesi': PersonalizzazioneCampo(
-        modificabilePartecipante: false,
-      ),
+      'insegnamento_id': PersonalizzazioneCampo(nascosto: true),
+      'anno_accademico': PersonalizzazioneCampo(modificabilePartecipante: false),
+      'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
     },
   );
 
@@ -49,52 +56,123 @@ class _MenteePageState extends State<MenteePage> {
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final mentoraggio = controller.mentoraggio;
-      final messaggioVuoto = controller.insegnamento == null
-          ? 'Nessun insegnamento per l’anno corrente.'
-          : 'Mentoraggio non ancora disponibile.';
-      return PaginaSchedaDinamica(
-        titolo: 'Ruolo mentee',
-        configurazione: configurazione,
-        valori: mentoraggio,
-        partecipante: widget.sessione.ruolo == AppRole.participant,
-        caricamento: controller.caricamento,
-        errore: controller.errore,
-        vuoto: mentoraggio == null,
-        messaggioVuoto: messaggioVuoto,
-        primaDeiCampi: mentoraggio == null
-            ? const <Widget>[]
-            : <Widget>[
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    controller.insegnamento!['insegnamento']?.toString() ?? '',
-                  ),
-                  subtitle: Text(
-                    controller.insegnamento!['anno_accademico']?.toString() ?? '',
-                  ),
-                ),
-                const Divider(height: 28),
-                Text(
-                  'Team di mentoraggio',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                ...controller.mentori.map(
-                  (mentore) => ListTile(
-                    leading: const Icon(Icons.person_outline),
-                    title: Text(
-                      '${mentore['nome'] ?? ''} ${mentore['cognome'] ?? ''}'.trim(),
-                    ),
-                    subtitle: Text(
-                      '${mentore['tipo'] ?? ''} · ${mentore['email_unipa'] ?? ''}',
-                    ),
-                  ),
-                ),
-                const Divider(height: 28),
-              ],
+        animation: controller,
+        builder: (context, _) => TemplatePaginaElencoDettaglio(
+          caricamento: controller.caricamento && controller.percorsi.isEmpty,
+          errore: controller.errore,
+          vuoto: controller.percorsi.isEmpty,
+          messaggioVuoto: 'Nessun mentoraggio disponibile nel ruolo mentee.',
+          larghezzaElenco: 350,
+          elenco: ElencoRecordDinamico<PercorsoMentee>(
+            elementi: controller.percorsi,
+            idSelezionato: controller.selezionato?.mentoraggio['id']?.toString(),
+            id: (p) => p.mentoraggio['id']?.toString() ?? '',
+            titolo: (p) => p.insegnamento['insegnamento']?.toString() ?? '',
+            sottotitolo: (p) =>
+                '${p.mentoraggio['anno_accademico'] ?? ''}${p.annoCorrente ? ' · corrente' : ' · storico'}',
+            onSeleziona: controller.seleziona,
+          ),
+          dettaglio: Card(margin: EdgeInsets.zero, child: _dettaglio()),
+        ),
       );
-    },
-  );
+
+  Widget _dettaglio() {
+    final percorso = controller.selezionato;
+    if (percorso == null) {
+      return const Center(child: Text('Seleziona un mentoraggio.'));
+    }
+
+    return DettaglioRecordDinamico(
+      configurazione: configurazione,
+      valori: percorso.mentoraggio,
+      partecipante: true,
+      prima: <Widget>[
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Ruolo mentee · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            ),
+            if (percorso.annoCorrente)
+              FilledButton.icon(
+                onPressed: controller.salvataggio ? null : _modifica,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Modifica dati annuali'),
+              ),
+          ],
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Insegnamento'),
+          subtitle: Text(percorso.insegnamento['insegnamento']?.toString() ?? ''),
+        ),
+        if (!percorso.annoCorrente)
+          const ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.lock_outline),
+            title: Text('Mentoraggio storico'),
+            subtitle: Text('I dati degli anni accademici precedenti sono in sola lettura.'),
+          ),
+        const Divider(),
+        Text('Team di mentoraggio', style: Theme.of(context).textTheme.titleMedium),
+        ...percorso.mentori.map(
+          (mentore) => ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: Text('${mentore['nome'] ?? ''} ${mentore['cognome'] ?? ''}'.trim()),
+            subtitle: Text('${mentore['tipo'] ?? ''} · ${mentore['email_unipa'] ?? ''}'),
+          ),
+        ),
+        const Divider(),
+      ],
+      dopo: _linkPdf(percorso.mentoraggio),
+    );
+  }
+
+  List<Widget> _linkPdf(Map<String, dynamic> mentoraggio) {
+    final url = mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
+    if (url.isEmpty) return const <Widget>[];
+    return <Widget>[
+      const Divider(height: 28),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => _apriPdf(url),
+          icon: const Icon(Icons.picture_as_pdf_outlined),
+          label: const Text('Apri scheda di sintesi PDF'),
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _apriPdf(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossibile aprire il PDF.')),
+      );
+    }
+  }
+
+  Future<void> _modifica() async {
+    final percorso = controller.selezionato;
+    if (percorso == null || !percorso.annoCorrente) return;
+    final valori = await mostraMascheraDinamica(
+      context: context,
+      configurazione: configurazione,
+      valoriIniziali: percorso.mentoraggio,
+      partecipante: true,
+      titolo:
+          'Dati ${percorso.insegnamento['insegnamento'] ?? ''} · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
+    );
+    if (valori == null) return;
+    try {
+      await controller.salva(valori);
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.messaggio)));
+    }
+  }
 }

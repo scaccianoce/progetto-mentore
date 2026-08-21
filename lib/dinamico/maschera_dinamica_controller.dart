@@ -339,10 +339,22 @@ class ConfigurazionePaginaDinamica {
   const ConfigurazionePaginaDinamica({
     required this.tabella,
     this.campi = const <String, PersonalizzazioneCampo>{},
+    this.prefissiNascostiPartecipante = const <String>[],
+    this.campiModificabiliPartecipante,
   });
 
   final String tabella;
   final Map<String, PersonalizzazioneCampo> campi;
+
+  /// Convenzione utile per viste di dominio: consente di nascondere al
+  /// partecipante intere famiglie di campi senza elencarle una per una.
+  /// Esempio: ['osservazioni'] nasconde osservazioni_aula,
+  /// osservazioni_focus_group e futuri campi con lo stesso prefisso.
+  final List<String> prefissiNascostiPartecipante;
+
+  /// Se valorizzato, per il partecipante sono modificabili soltanto i campi
+  /// inclusi nell'insieme. Gli altri restano visibili ma in sola lettura.
+  final Set<String>? campiModificabiliPartecipante;
 }
 
 /// Eccezioni puramente grafiche che non appartengono allo schema PostgreSQL.
@@ -418,6 +430,21 @@ abstract final class ConfigurazioneMaschere {
         campo = applicaUna(campo, campiSistema[campo.nome]);
         campo = applicaUna(campo, configurazioneTabella[campo.nome]);
         campo = applicaUna(campo, configurazionePagina[campo.nome]);
+
+        if (pagina?.tabella == tabella.nome) {
+          final nascostoPerPrefisso = pagina!.prefissiNascostiPartecipante.any(
+            (prefisso) => campo.nome.startsWith(prefisso),
+          );
+          if (nascostoPerPrefisso) {
+            campo = campo.copyWith(visibilePartecipante: false);
+          }
+
+          final modificabili = pagina.campiModificabiliPartecipante;
+          if (modificabili != null && !modificabili.contains(campo.nome)) {
+            campo = campo.copyWith(modificabilePartecipante: false);
+          }
+        }
+
         return campo;
       }).toList(growable: false),
     );

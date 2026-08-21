@@ -23,8 +23,11 @@ class NotifichePushService {
   final ValueNotifier<int> aggiornamenti = ValueNotifier<int>(0);
   final StreamController<RemoteMessage> _apertureController =
       StreamController<RemoteMessage>.broadcast();
+  final StreamController<RemoteMessage> _foregroundController =
+      StreamController<RemoteMessage>.broadcast();
 
   Stream<RemoteMessage> get apertureNotifiche => _apertureController.stream;
+  Stream<RemoteMessage> get notificheForeground => _foregroundController.stream;
 
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<AuthState>? _authSubscription;
@@ -88,6 +91,7 @@ class NotifichePushService {
             'Notifica FCM ricevuta in foreground: ${messaggio.messageId}',
           );
           aggiornamenti.value++;
+          _foregroundController.add(messaggio);
         },
       );
 
@@ -218,5 +222,8 @@ class NotifichePushService {
     _foregroundSubscription = null;
     _openedSubscription = null;
     _inizializzato = false;
+
+    await _apertureController.close();
+    await _foregroundController.close();
   }
 }

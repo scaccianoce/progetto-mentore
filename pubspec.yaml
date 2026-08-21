@@ -38,6 +38,7 @@ dependencies:
   supabase_flutter: ^2.10.3
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

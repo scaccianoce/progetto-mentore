@@ -1,100 +1,316 @@
 import 'package:flutter/foundation.dart';
 
 import '../../app_exception.dart';
-import '../../dinamico/controller_crud_dinamico.dart';
-import '../../dinamico/repository_dinamico.dart';
 import '../../sessione_controller.dart';
+import '../../supabase_config.dart';
+import 'scelta_insegnamento_annuale_controller.dart';
 
-/// Controller specifico SOLO per il contesto dell'insegnamento.
-///
-/// Il CRUD e lo stato di caricamento/salvataggio del record sono delegati a
-/// ControllerSchedaCrudDinamico. Qui resta la sola logica di dominio:
-/// utente corrente + anno accademico corrente.
 class InsegnamentoController extends ChangeNotifier {
   InsegnamentoController({
-    required this.sessione,
-    RepositoryDinamico? repository,
-  }) : _repository = repository ?? RepositoryDinamico(),
-       _crud = ControllerSchedaCrudDinamico(
-         tabella: 'insegnamenti',
-         messaggioErroreCaricamento: 'Impossibile caricare l’insegnamento.',
-         messaggioErroreSalvataggio: 'Impossibile salvare l’insegnamento.',
-       ) {
-    _crud.addListener(_propaga);
+    required SessioneController sessione,
+  });
+
+  final SceltaInsegnamentoAnnualeController
+      _sceltaAnnualeController =
+      SceltaInsegnamentoAnnualeController();
+
+  List<InsegnamentoStorico> _insegnamenti = const [];
+  int _indiceSelezionato = 0;
+
+  bool _caricamento = false;
+  bool _salvataggio = false;
+
+  String? _errore;
+
+  List<InsegnamentoStorico> get insegnamenti =>
+      _insegnamenti;
+
+  int get indiceSelezionato =>
+      _indiceSelezionato;
+
+  InsegnamentoStorico? get selezionato {
+    if (_insegnamenti.isEmpty) {
+      return null;
+    }
+
+    if (_indiceSelezionato < 0 ||
+        _indiceSelezionato >= _insegnamenti.length) {
+      return _insegnamenti.first;
+    }
+
+    return _insegnamenti[_indiceSelezionato];
   }
 
-  final SessioneController sessione;
-  final RepositoryDinamico _repository;
-  final ControllerSchedaCrudDinamico _crud;
+  bool get caricamento => _caricamento;
 
-  String? _annoCorrente;
-  bool _caricamentoContesto = false;
-  String? _erroreContesto;
+  bool get salvataggio => _salvataggio;
 
-  Map<String, dynamic>? get insegnamento => _crud.record;
-  String? get annoCorrente => _annoCorrente;
-  bool get puoModificare => _annoCorrente != null && sessione.utente != null;
-  bool get caricamento => _caricamentoContesto || _crud.caricamento;
-  bool get salvataggio => _crud.salvataggio;
-  String? get errore => _erroreContesto ?? _crud.errore;
+  String? get errore => _errore;
+
+  // ============================================================
+  // CARICAMENTO
+  // ============================================================
 
   Future<void> carica() async {
-    final userId = sessione.utente?.id;
-    if (userId == null) {
-      _erroreContesto = 'Sessione assente.';
+    _caricamento = true;
+    _errore = null;
+    notifyListeners();
+
+    try {
+      final userId =
+          SupabaseConfig.client.auth.currentUser?.id;
+
+      if (userId == null) {
+        throw const AppException(
+          'Utente non autenticato.',
+        );
+      }
+
+      final risultati =
+          await Future.wait<dynamic>([
+        _sceltaAnnualeController
+            .caricaInsegnamenti(),
+
+        SupabaseConfig.client.rpc(
+          'mentoraggi_del_mentee',
+        ),
+      ]);
+
+      final insegnamentiRaw =
+          (risultati[0] as List)
+              .map(
+                (e) =>
+                    Map<String, dynamic>.from(
+                  e as Map,
+                ),
+              )
+              .toList();
+
+      final mentoraggiRaw =
+          (risultati[1] as List)
+              .map(
+                (e) =>
+                    Map<String, dynamic>.from(
+                  e as Map,
+                ),
+              )
+              .toList();
+
+      final elementi =
+          <InsegnamentoStorico>[];
+
+      for (final insegnamento
+          in insegnamentiRaw) {
+        final id =
+            insegnamento['id']
+                ?.toString();
+
+        final mentoraggi =
+            mentoraggiRaw
+                .where(
+                  (mentoraggio) =>
+                      mentoraggio[
+                                  'insegnamento_id']
+                              ?.toString() ==
+                          id,
+                )
+                .toList();
+
+        mentoraggi.sort(
+          (a, b) {
+            final annoA =
+                a['anno_accademico']
+                        ?.toString() ??
+                    '';
+
+            final annoB =
+                b['anno_accademico']
+                        ?.toString() ??
+                    '';
+
+            return annoB.compareTo(annoA);
+          },
+        );
+
+        elementi.add(
+          InsegnamentoStorico(
+            insegnamento:
+                insegnamento,
+            mentoraggi:
+                mentoraggi,
+          ),
+        );
+      }
+
+      _insegnamenti =
+          elementi;
+
+      if (_insegnamenti.isEmpty) {
+        _indiceSelezionato = 0;
+      } else if (_indiceSelezionato >=
+          _insegnamenti.length) {
+        _indiceSelezionato =
+            _insegnamenti.length - 1;
+      }
+    } on AppException catch (e) {
+      _errore = e.messaggio;
+    } catch (e) {
+      _errore =
+          AppErrorMapper.converti(
+        e,
+        messaggioGenerico:
+            'Impossibile caricare gli insegnamenti.',
+      ).messaggio;
+    } finally {
+      _caricamento = false;
       notifyListeners();
+    }
+  }
+
+  // ============================================================
+  // SELEZIONE TAB
+  // ============================================================
+
+  void seleziona(int indice) {
+    if (indice < 0 ||
+        indice >= _insegnamenti.length) {
       return;
     }
 
-    _caricamentoContesto = true;
-    _erroreContesto = null;
-    notifyListeners();
-    try {
-      final anno = await _repository.singolo(
-        tabella: 'anni_accademici',
-        colonne: 'codice',
-        filtri: const <FiltroDinamico>[FiltroDinamico('corrente', true)],
-      );
-      _annoCorrente = anno?['codice']?.toString();
-      if (_annoCorrente == null) {
-        throw const AppException('Nessun anno accademico corrente impostato.');
-      }
+    if (_indiceSelezionato == indice) {
+      return;
+    }
 
-      await _crud.carica(
-        filtri: <FiltroDinamico>[
-          FiltroDinamico('docente_id', userId),
-          FiltroDinamico('anno_accademico', _annoCorrente!),
-        ],
+    _indiceSelezionato = indice;
+    notifyListeners();
+  }
+
+  // ============================================================
+  // CREAZIONE
+  // ============================================================
+
+  Future<void> creaInsegnamento(
+    Map<String, dynamic> valori,
+  ) async {
+    _salvataggio = true;
+    _errore = null;
+    notifyListeners();
+
+    try {
+      await _sceltaAnnualeController
+          .crea(
+        valori,
       );
-    } catch (errore) {
-      _erroreContesto = AppErrorMapper.converti(
-        errore,
-        messaggioGenerico: 'Impossibile determinare l’anno accademico corrente.',
-      ).messaggio;
+
+      await carica();
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      throw AppErrorMapper.converti(
+        e,
+        messaggioGenerico:
+            'Impossibile creare l’insegnamento.',
+      );
     } finally {
-      _caricamentoContesto = false;
+      _salvataggio = false;
       notifyListeners();
     }
   }
 
-  Future<void> salva(Map<String, dynamic> valori) async {
-    final userId = sessione.utente?.id;
-    if (userId == null || _annoCorrente == null) {
-      throw const AppException('Modifica dell’insegnamento non autorizzata.');
+  // ============================================================
+  // SELEZIONE INSEGNAMENTO PRECEDENTE
+  // ============================================================
+
+  Future<void> selezionaInsegnamento(
+    String insegnamentoId,
+  ) async {
+    _salvataggio = true;
+    _errore = null;
+    notifyListeners();
+
+    try {
+      await _sceltaAnnualeController
+          .seleziona(
+        insegnamentoId,
+      );
+
+      await carica();
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      throw AppErrorMapper.converti(
+        e,
+        messaggioGenerico:
+            'Impossibile associare l’insegnamento all’anno accademico.',
+      );
+    } finally {
+      _salvataggio = false;
+      notifyListeners();
     }
-    await _crud.salva(<String, dynamic>{
-      ...valori,
-      'docente_id': userId,
-      'anno_accademico': _annoCorrente,
-    });
   }
 
-  void _propaga() => notifyListeners();
+  // ============================================================
+  // MODIFICA AUTORIZZATA
+  // ============================================================
 
-  @override
-  void dispose() {
-    _crud.removeListener(_propaga);
-    _crud.dispose();
-    super.dispose();
+  Future<void> modificaInsegnamento(
+    String insegnamentoId,
+    Map<String, dynamic> valori,
+  ) async {
+    _salvataggio = true;
+    _errore = null;
+    notifyListeners();
+
+    try {
+      await _sceltaAnnualeController
+          .modifica(
+        insegnamentoId,
+        valori,
+      );
+
+      await carica();
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      throw AppErrorMapper.converti(
+        e,
+        messaggioGenerico:
+            'Impossibile modificare l’insegnamento.',
+      );
+    } finally {
+      _salvataggio = false;
+      notifyListeners();
+    }
   }
+
+  // ============================================================
+  // COMPATIBILITÀ CON EVENTUALE CODICE PRECEDENTE
+  // ============================================================
+
+  Future<void> salvaInsegnamento(
+    Map<String, dynamic> valori, {
+    String? insegnamentoId,
+  }) async {
+    if (insegnamentoId == null) {
+      await creaInsegnamento(
+        valori,
+      );
+    } else {
+      await modificaInsegnamento(
+        insegnamentoId,
+        valori,
+      );
+    }
+  }
+}
+
+class InsegnamentoStorico {
+  const InsegnamentoStorico({
+    required this.insegnamento,
+    required this.mentoraggi,
+  });
+
+  final Map<String, dynamic> insegnamento;
+
+  final List<Map<String, dynamic>> mentoraggi;
 }

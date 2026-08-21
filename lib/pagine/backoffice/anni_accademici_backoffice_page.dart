@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../supabase_config.dart';
 import 'backoffice_controller.dart';
+import 'backoffice_dati_anno.dart';
 
 /// Sintesi annuale calcolata direttamente dalle tabelle reali del DB.
 /// Non richiede view/materialized view/RPC di riepilogo.
@@ -52,6 +53,7 @@ class _AnniAccademiciBackofficePageState
         db.from('partecipazioni_eventi').select(),
         db.from('house_of_mentore').select(),
         db.from('partecipazioni_house_of_mentore').select(),
+        db.from('partecipazioni_annuali').select(),
       ]);
       final insegnamenti = _mappe(risultati[0]);
       final mentoraggi = _mappe(risultati[1]);
@@ -60,6 +62,7 @@ class _AnniAccademiciBackofficePageState
       final partecipazioniEventi = _mappe(risultati[4]);
       final hom = _mappe(risultati[5]);
       final partecipazioniHom = _mappe(risultati[6]);
+      final partecipazioniAnnuali = _mappe(risultati[7]);
 
       final risultato = <String, _RiepilogoAnno>{};
       for (final anno in widget.controller.anni) {
@@ -74,6 +77,7 @@ class _AnniAccademiciBackofficePageState
           partecipazioniEventi: partecipazioniEventi,
           hom: hom,
           partecipazioniHom: partecipazioniHom,
+          partecipazioniAnnuali: partecipazioniAnnuali,
         );
       }
       if (!mounted) return;
@@ -140,7 +144,11 @@ class _AnniAccademiciBackofficePageState
                     child: DataTable(
                       columns: const [
                         DataColumn(label: Text('Anno')),
+                        DataColumn(label: Text('Stato')),
                         DataColumn(label: Text('Partecipanti'), numeric: true),
+                        DataColumn(label: Text('Da confermare'), numeric: true),
+                        DataColumn(label: Text('Confermati'), numeric: true),
+                        DataColumn(label: Text('Rinunce'), numeric: true),
                         DataColumn(label: Text('Insegnamenti'), numeric: true),
                         DataColumn(
                           label: Text('Insegnamenti mentorati'),
@@ -191,7 +199,11 @@ class _AnniAccademiciBackofficePageState
           ),
         Text(codice),
       ])),
+      DataCell(_chipStatoAnno(anno)),
       DataCell(Text('${r.partecipanti}')),
+      DataCell(Text('${r.daConfermare}')),
+      DataCell(Text('${r.confermati}')),
+      DataCell(Text('${r.rinunce}')),
       DataCell(Text('${r.insegnamenti}')),
       DataCell(Text('${r.insegnamentiMentorati}')),
       DataCell(Text('${r.mentoraggiConclusi}')),
@@ -203,34 +215,43 @@ class _AnniAccademiciBackofficePageState
       DataCell(Text('${r.iscrizioniHom}')),
       DataCell(Text('${r.presenzeHom}')),
       DataCell(Text(r.mediaPresenzeHom.toStringAsFixed(1))),
-      DataCell(Row(mainAxisSize: MainAxisSize.min,
+      DataCell(
+        Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
               tooltip: 'Esporta tabelle CSV',
               onPressed: () => _esportaAnno(context, codice),
               icon: const Icon(Icons.download_outlined),
             ),
-            if (!_annoCorrente(anno))
+            if (_statoAnno(anno) == 'preparazione')
               IconButton(
-                tooltip: 'Rendi $codice anno accademico corrente',
-                onPressed: () async {
-                  final errore = await widget.controller.impostaAnnoCorrente(codice);
-                  if (!context.mounted) return;
-                  if (errore == null) {
-                    // Ricarica gli anni dal DB, altrimenti la tabella
-                    // continua a mostrare il vecchio valore di "corrente".
-                    await widget.controller.carica();
-                    if (!context.mounted) return;
-                    await _caricaSintesi();
-                    if (!context.mounted) return;
-                  }
-                  _messaggio(context, errore);
-                },
-                icon: const Icon(Icons.check_circle_outline),
+                tooltip: 'Genera richieste di conferma dai partecipanti dell’anno attivo',
+                onPressed: () => _generaRichieste(context, codice),
+                icon: const Icon(Icons.how_to_reg_outlined),
               ),
+            PopupMenuButton<String>(
+              tooltip: 'Cambia stato anno',
+              onSelected: (stato) => _impostaStatoAnno(context, codice, stato),
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: 'preparazione',
+                  child: Text('Imposta in preparazione'),
+                ),
+                PopupMenuItem(
+                  value: 'attivo',
+                  child: Text('Imposta attivo'),
+                ),
+                PopupMenuItem(
+                  value: 'chiuso',
+                  child: Text('Chiudi anno'),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+
     ]);
   }
 
@@ -243,13 +264,17 @@ class _AnniAccademiciBackofficePageState
     required List<Map<String, dynamic>> partecipazioniEventi,
     required List<Map<String, dynamic>> hom,
     required List<Map<String, dynamic>> partecipazioniHom,
+    required List<Map<String, dynamic>> partecipazioniAnnuali,
   }) {
-    final insAnno = insegnamenti
+    final mentAnno = mentoraggi
         .where((r) => r['anno_accademico']?.toString() == anno)
         .toList();
-    final insIds = insAnno.map((r) => r['id']?.toString()).whereType<String>().toSet();
-    final mentAnno = mentoraggi
-        .where((r) => insIds.contains(r['insegnamento_id']?.toString()))
+    final insIds = mentAnno
+        .map((r) => r['insegnamento_id']?.toString())
+        .whereType<String>()
+        .toSet();
+    final insAnno = insegnamenti
+        .where((r) => insIds.contains(r['id']?.toString()))
         .toList();
     final mentIds = mentAnno.map((r) => r['id']?.toString()).whereType<String>().toSet();
     final mentoriIds = assegnazioni
@@ -283,9 +308,25 @@ class _AnniAccademiciBackofficePageState
         .toList();
     final presenzeHom = ph.where((r) => r['presente'] == true).length;
 
+    final annualiAnno = partecipazioniAnnuali
+        .where((r) => r['anno_accademico']?.toString() == anno)
+        .toList();
+    final daConfermare = annualiAnno
+        .where((r) => r['stato']?.toString() == 'da_contattare')
+        .length;
+    final confermati = annualiAnno
+        .where((r) => <String>{'confermato', 'nuovo'}.contains(r['stato']?.toString()))
+        .length;
+    final rinunce = annualiAnno
+        .where((r) => r['stato']?.toString() == 'rinuncia')
+        .length;
+
     return _RiepilogoAnno(
       anno: anno,
-      partecipanti: partecipanti.length,
+      partecipanti: annualiAnno.isEmpty ? partecipanti.length : annualiAnno.length,
+      daConfermare: daConfermare,
+      confermati: confermati,
+      rinunce: rinunce,
       insegnamenti: insAnno.length,
       insegnamentiMentorati: insegnamentiMentoratiIds.length,
       mentoraggiConclusi: mentAnno.where(_mentoraggioConcluso).length,
@@ -355,63 +396,71 @@ class _AnniAccademiciBackofficePageState
     }
   }
 
-  Future<Map<String, List<Map<String, dynamic>>>> _datiGrezziAnno(String anno) async {
+  Future<Map<String, List<Map<String, dynamic>>>> _datiGrezziAnno(
+    String anno,
+  ) async {
     final db = SupabaseConfig.client;
-    final anni = _mappe(await db.from('anni_accademici').select().eq('codice', anno));
-    final insegnamenti = _mappe(await db.from('insegnamenti').select().eq('anno_accademico', anno));
-    final insIds = insegnamenti.map((r) => r['id']?.toString()).whereType<String>().toList();
-    final mentoraggi = insIds.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('mentoraggi').select().inFilter('insegnamento_id', insIds));
-    final mentoraggioIds = mentoraggi.map((r) => r['id']?.toString()).whereType<String>().toList();
-    final assegnazioni = mentoraggioIds.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('mentoraggio_mentori').select().inFilter('mentoraggio_id', mentoraggioIds));
+    final rigaAnno = _mappe(
+      await db.from('anni_accademici').select().eq('codice', anno),
+    );
 
-    final eventi = _mappe(await db.from('eventi').select().eq('anno_accademico', anno));
-    final eventoIds = eventi.map((r) => r['id']?.toString()).whereType<String>().toList();
-    final partecipazioniEventi = eventoIds.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('partecipazioni_eventi').select().inFilter('evento_id', eventoIds));
+    // Tutte le relazioni annuali partono da mentoraggi.anno_accademico.
+    // Non viene mai interrogato insegnamenti.anno_accademico, colonna che
+    // nella nuova struttura non esiste piu.
+    final dati = await BackofficeDatiAnno.carica(anno);
 
-    final hom = _mappe(await db.from('house_of_mentore').select().eq('anno_accademico', anno));
-    final homIds = hom.map((r) => r['id']?.toString()).whereType<String>().toList();
-    final opzioniHom = homIds.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('house_of_mentore_opzioni').select().inFilter('evento_id', homIds));
-    final partecipazioniHom = homIds.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('partecipazioni_house_of_mentore').select().inFilter('evento_id', homIds));
+    return dati.esportazione(rigaAnno: rigaAnno);
+  }
 
-    final partecipanteIds = <String>{
-      ...insegnamenti.map((r) => r['docente_id']?.toString()).whereType<String>(),
-      ...assegnazioni.map((r) => r['mentore_id']?.toString()).whereType<String>(),
-    }..removeWhere((v) => v.isEmpty || v == 'null');
-    final ids = partecipanteIds.toList();
-    final anagrafica = ids.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('anagrafica').select().inFilter('user_id', ids));
-    final riservata = ids.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('anagrafica_riservata').select().inFilter('user_id', ids));
-    final ruoli = ids.isEmpty
-        ? <Map<String, dynamic>>[]
-        : _mappe(await db.from('user_roles').select().inFilter('user_id', ids));
+  Future<void> _impostaStatoAnno(
+    BuildContext context,
+    String codice,
+    String stato,
+  ) async {
+    final errore = await widget.controller.impostaStatoAnno(codice, stato);
+    if (!context.mounted) return;
+    if (errore == null) {
+      await _caricaSintesi();
+      if (!context.mounted) return;
+    }
+    _messaggio(context, errore);
+  }
 
-    return {
-      'anni_accademici': anni,
-      'anagrafica': anagrafica,
-      'anagrafica_riservata': riservata,
-      'user_roles': ruoli,
-      'insegnamenti': insegnamenti,
-      'mentoraggi': mentoraggi,
-      'mentoraggio_mentori': assegnazioni,
-      'eventi': eventi,
-      'partecipazioni_eventi': partecipazioniEventi,
-      'house_of_mentore': hom,
-      'house_of_mentore_opzioni': opzioniHom,
-      'partecipazioni_house_of_mentore': partecipazioniHom,
-    };
+  Future<void> _generaRichieste(
+    BuildContext context,
+    String annoDestinazione,
+  ) async {
+    final annoSorgente = widget.controller.annoAttivo;
+    final conferma = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Generare le richieste di partecipazione?'),
+            content: Text(
+              'Verranno predisposte le richieste per $annoDestinazione '
+              'partendo dai partecipanti dell’anno '
+              '${annoSorgente ?? 'attivo'}. Le righe già presenti non verranno duplicate.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Genera'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!conferma) return;
+
+    final errore = await widget.controller.generaRichiestePartecipazione(
+      annoDestinazione,
+      annoSorgente: annoSorgente,
+    );
+    if (!context.mounted) return;
+    _messaggio(context, errore);
   }
 
   Future<void> _nuovoAnno(BuildContext context) async {
@@ -491,6 +540,9 @@ class _RiepilogoAnno {
   const _RiepilogoAnno({
     required this.anno,
     required this.partecipanti,
+    required this.daConfermare,
+    required this.confermati,
+    required this.rinunce,
     required this.insegnamenti,
     required this.insegnamentiMentorati,
     required this.mentoraggiConclusi,
@@ -507,6 +559,9 @@ class _RiepilogoAnno {
   factory _RiepilogoAnno.vuoto(String anno) => _RiepilogoAnno(
         anno: anno,
         partecipanti: 0,
+        daConfermare: 0,
+        confermati: 0,
+        rinunce: 0,
         insegnamenti: 0,
         insegnamentiMentorati: 0,
         mentoraggiConclusi: 0,
@@ -522,6 +577,9 @@ class _RiepilogoAnno {
 
   final String anno;
   final int partecipanti;
+  final int daConfermare;
+  final int confermati;
+  final int rinunce;
   final int insegnamenti;
   final int insegnamentiMentorati;
   final int mentoraggiConclusi;
@@ -533,6 +591,23 @@ class _RiepilogoAnno {
   final int iscrizioniHom;
   final int presenzeHom;
   final double mediaPresenzeHom;
+}
+
+String _statoAnno(Map<String, dynamic> anno) {
+  final stato = anno['stato']?.toString();
+  if (stato != null && stato.isNotEmpty) return stato;
+  return _annoCorrente(anno) ? 'attivo' : 'chiuso';
+}
+
+Widget _chipStatoAnno(Map<String, dynamic> anno) {
+  final stato = _statoAnno(anno);
+  final etichetta = switch (stato) {
+    'preparazione' => 'Preparazione',
+    'attivo' => 'Attivo',
+    'chiuso' => 'Chiuso',
+    _ => stato,
+  };
+  return Chip(label: Text(etichetta));
 }
 
 bool _annoCorrente(Map<String, dynamic> anno) {

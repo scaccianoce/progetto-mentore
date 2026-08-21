@@ -182,6 +182,6 @@ class _NotifichePageState extends State<NotifichePage> {
     final ora = data.hour.toString().padLeft(2, '0');
     final minuti = data.minute.toString().padLeft(2, '0');
     final anno = notifica.annoAccademico;
-    return '${giorno}/${mese}/${data.year} $ora:$minuti${anno == null ? '' : ' · $anno'}';
+    return '$giorno/$mese/$data.year $ora:$minuti${anno == null ? '' : ' · $anno'}';
   }
 }

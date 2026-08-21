@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../supabase_config.dart';
 import 'maschera_dinamica_controller.dart';
+import 'mentoraggi_ui_config.dart';
+
 
 Future<Map<String, dynamic>?> mostraMascheraDinamica({
   required BuildContext context,
@@ -71,33 +73,167 @@ class CampiTabellaDinamici extends StatelessWidget {
     builder: (context, snapshot) {
       final tabella = ConfigurazioneMaschere.applica(
         snapshot.data?.tabella(configurazione.tabella) ??
-            TabellaDatabase.daRiga(configurazione.tabella, valori),
+            TabellaDatabase.daRiga(
+              configurazione.tabella,
+              valori,
+            ),
         pagina: configurazione,
       );
+
       final campi = tabella.campi
           .where(
             (campo) =>
-                campo.visibilePer(partecipante: partecipante) &&
+                campo.visibilePer(
+                  partecipante: partecipante,
+                ) &&
                 valori.containsKey(campo.nome),
           )
-          .toList(growable: false);
-      return Column(
-        children: campi
-            .map(
-              (campo) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  campo.etichetta,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+          .toList();
+
+      // ----------------------------------------------------------
+      // PER TUTTE LE TABELLE DIVERSE DA mentoraggi
+      // manteniamo il comportamento standard.
+      // ----------------------------------------------------------
+
+      if (configurazione.tabella != 'mentoraggi') {
+        return Column(
+          children: campi
+              .map(
+                (campo) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    campo.etichetta,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: _valoreDinamico(
+                    campo,
+                    valori[campo.nome],
+                  ),
                 ),
-                subtitle: _valoreDinamico(campo, valori[campo.nome]),
+              )
+              .toList(growable: false),
+        );
+      }
+
+      // ----------------------------------------------------------
+      // MENTORAGGI
+      //
+      // Ordiniamo prima per sezione e poi per ordine del campo.
+      // ----------------------------------------------------------
+
+      campi.sort((a, b) {
+        final confrontoSezione =
+            MentoraggiUiConfig
+                .ordineSezione(a.nome)
+                .compareTo(
+                  MentoraggiUiConfig
+                      .ordineSezione(b.nome),
+                );
+
+        if (confrontoSezione != 0) {
+          return confrontoSezione;
+        }
+
+        final confrontoCampo =
+            MentoraggiUiConfig
+                .ordine(a.nome)
+                .compareTo(
+                  MentoraggiUiConfig
+                      .ordine(b.nome),
+                );
+
+        if (confrontoCampo != 0) {
+          return confrontoCampo;
+        }
+
+        return a.etichetta.compareTo(
+          b.etichetta,
+        );
+      });
+
+      final widgets = <Widget>[];
+
+      String? sezionePrecedente;
+
+      for (final campo in campi) {
+        final sezione =
+            MentoraggiUiConfig.sezione(
+          campo.nome,
+        );
+
+        // --------------------------------------------------------
+        // NUOVA SEZIONE
+        // --------------------------------------------------------
+
+        if (sezione != sezionePrecedente) {
+          if (widgets.isNotEmpty) {
+            widgets.add(
+              const SizedBox(height: 16),
+            );
+          }
+
+          widgets.add(
+            Padding(
+              padding: const EdgeInsets.only(
+                top: 8,
+                bottom: 4,
               ),
-            )
-            .toList(growable: false),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  MentoraggiUiConfig
+                      .titoloSezione(sezione),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                ),
+              ),
+            ),
+          );
+
+          widgets.add(
+            const Divider(),
+          );
+
+          sezionePrecedente = sezione;
+        }
+
+        // --------------------------------------------------------
+        // CAMPO
+        // --------------------------------------------------------
+
+        widgets.add(
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              campo.etichetta,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            subtitle: _valoreDinamico(
+              campo,
+              valori[campo.nome],
+            ),
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
+        children: widgets,
       );
     },
   );
 }
+
 
 Widget _valoreDinamico(CampoDatabase campo, Object? valore) {
   // Per i campi testuali non eliminiamo gli a capo inseriti dall'utente.
@@ -148,13 +284,56 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
     return campo.modificabilePer(partecipante: widget.partecipante);
   });
 
+  bool get _eMentoraggi =>
+    widget.tabella.nome == 'mentoraggi';
+
+  List<CampoDatabase> get _campiOrdinati {
+    final campi = _campi.toList();
+
+    if (!_eMentoraggi) {
+      return campi;
+    }
+
+    campi.sort((a, b) {
+      final confrontoSezione =
+          MentoraggiUiConfig
+              .ordineSezione(a.nome)
+              .compareTo(
+                MentoraggiUiConfig
+                    .ordineSezione(b.nome),
+              );
+
+      if (confrontoSezione != 0) {
+        return confrontoSezione;
+      }
+
+      final confrontoOrdine =
+          MentoraggiUiConfig
+              .ordine(a.nome)
+              .compareTo(
+                MentoraggiUiConfig
+                    .ordine(b.nome),
+              );
+
+      if (confrontoOrdine != 0) {
+        return confrontoOrdine;
+      }
+
+      // Per i campi senza ordine esplicito
+      // manteniamo comunque un risultato stabile.
+      return a.etichetta.compareTo(b.etichetta);
+    });
+
+    return campi;
+  }
+
   bool _modificabile(CampoDatabase campo) =>
       campo.modificabilePer(partecipante: widget.partecipante);
 
   @override
   void initState() {
     super.initState();
-    for (final campo in _campi) {
+    for (final campo in _campiOrdinati) {
       final valore = widget.valoriIniziali[campo.nome];
       _valori[campo.nome] = valore;
       if (_usaController(campo.tipo)) {
@@ -186,14 +365,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _campi
-                .map(
-                  (campo) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _costruisciCampo(campo),
-                  ),
-                )
-                .toList(growable: false),
+            children: _costruisciCampi(),
           ),
         ),
       ),
@@ -206,6 +378,77 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
       FilledButton(onPressed: _salva, child: const Text('Salva')),
     ],
   );
+
+
+  List<Widget> _costruisciCampi() {
+    final campi = _campiOrdinati;
+
+    if (!_eMentoraggi) {
+      return campi
+          .map(
+            (campo) => Padding(
+              padding: const EdgeInsets.only(
+                bottom: 12,
+              ),
+              child: _costruisciCampo(campo),
+            ),
+          )
+          .toList(growable: false);
+    }
+
+    final widgets = <Widget>[];
+
+    String? sezionePrecedente;
+
+    for (final campo in campi) {
+      final sezione =
+          MentoraggiUiConfig.sezione(campo.nome);
+
+      if (sezione != sezionePrecedente) {
+        if (widgets.isNotEmpty) {
+          widgets.add(
+            const SizedBox(height: 12),
+          );
+        }
+
+        widgets.add(
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 8,
+              bottom: 6,
+            ),
+            child: Text(
+              MentoraggiUiConfig
+                  .titoloSezione(sezione),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+          ),
+        );
+
+        widgets.add(
+          const Divider(height: 12),
+        );
+
+        sezionePrecedente = sezione;
+      }
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(
+            bottom: 12,
+          ),
+          child: _costruisciCampo(campo),
+        ),
+      );
+    }
+
+    return widgets;
+  }
 
   Widget _costruisciCampo(CampoDatabase campo) => switch (campo.tipo) {
     TipoCampoDinamico.booleano => SwitchListTile(
@@ -342,7 +585,92 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
     final relazione = campo.relazione;
     if (relazione == null) return;
     _relazioniInCaricamento.add(campo.nome);
+
     try {
+      // -------------------------------------------------------------------
+      // ANAGRAFICA
+      // Valore tecnico: user_id (o la colonna FK richiesta dallo schema).
+      // Etichetta mostrata: email_unipa, che deve essere univoca.
+      // -------------------------------------------------------------------
+      if (relazione.tabella == 'anagrafica') {
+        final List<dynamic> righe = await SupabaseConfig.client
+            .from('anagrafica')
+            .select('${relazione.colonna}, email_unipa, cognome, nome')
+            .order('email_unipa')
+            .limit(1000);
+
+        _opzioniRelazione[campo.nome] = righe.map((riga) {
+          final mappa = Map<String, dynamic>.from(riga as Map);
+          final valore = mappa[relazione.colonna].toString();
+          final email = mappa['email_unipa']?.toString().trim() ?? '';
+          return _OpzioneRelazione(
+            valore: valore,
+            etichetta: email.isEmpty ? valore : email,
+          );
+        }).toList(growable: false);
+        return;
+      }
+
+      // -------------------------------------------------------------------
+      // INSEGNAMENTI
+      // Valore tecnico: id (o colonna FK).
+      // Etichetta mostrata: "insegnamento — email docente".
+      // -------------------------------------------------------------------
+      if (relazione.tabella == 'insegnamenti') {
+        final List<dynamic> righe = await SupabaseConfig.client
+            .from('insegnamenti')
+            .select('${relazione.colonna}, insegnamento, docente_id')
+            .limit(1000);
+
+        final docenteIds = righe
+            .map((r) => (r as Map)['docente_id']?.toString())
+            .whereType<String>()
+            .where((v) => v.isNotEmpty)
+            .toSet()
+            .toList();
+
+        final emailPerDocente = <String, String>{};
+        if (docenteIds.isNotEmpty) {
+          final List<dynamic> docenti = await SupabaseConfig.client
+              .from('anagrafica')
+              .select('user_id, email_unipa')
+              .inFilter('user_id', docenteIds);
+          for (final riga in docenti) {
+            final mappa = Map<String, dynamic>.from(riga as Map);
+            final id = mappa['user_id']?.toString();
+            final email = mappa['email_unipa']?.toString().trim();
+            if (id != null && email != null && email.isNotEmpty) {
+              emailPerDocente[id] = email;
+            }
+          }
+        }
+
+        final opzioni = righe.map((riga) {
+          final mappa = Map<String, dynamic>.from(riga as Map);
+          final valore = mappa[relazione.colonna].toString();
+          final nome = mappa['insegnamento']?.toString().trim() ?? '';
+          final docenteId = mappa['docente_id']?.toString();
+          final email = docenteId == null ? null : emailPerDocente[docenteId];
+          final etichetta = [
+            if (nome.isNotEmpty) nome,
+            if (email != null && email.isNotEmpty) email,
+          ].join(' — ');
+          return _OpzioneRelazione(
+            valore: valore,
+            etichetta: etichetta.isEmpty ? valore : etichetta,
+          );
+        }).toList(growable: true)
+          ..sort((a, b) => a.etichetta.toLowerCase().compareTo(
+                b.etichetta.toLowerCase(),
+              ));
+
+        _opzioniRelazione[campo.nome] = opzioni;
+        return;
+      }
+
+      // -------------------------------------------------------------------
+      // Comportamento generico per tutte le altre relazioni.
+      // -------------------------------------------------------------------
       final tabellaCollegata = SupabaseConfig.schemaDatabase?.tabella(
         relazione.tabella,
       );
@@ -381,7 +709,7 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
   void _salva() {
     if (!(_form.currentState?.validate() ?? false)) return;
     final risultato = <String, dynamic>{};
-    for (final campo in _campi.where(_modificabile)) {
+    for (final campo in _campiOrdinati.where(_modificabile)) {
       if (_usaController(campo.tipo)) {
         final originale = _controller[campo.nome]!.text;
         final multilinea = campo.tipo == TipoCampoDinamico.testoMultiriga ||

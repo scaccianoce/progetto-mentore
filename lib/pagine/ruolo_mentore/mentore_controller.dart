@@ -10,122 +10,175 @@ class PercorsoMentore {
     required this.insegnamento,
     required this.docente,
     required this.team,
+    required this.annoCorrente,
+    required this.mioRuolo,
   });
+
   final Map<String, dynamic> mentoraggio;
   final Map<String, dynamic> insegnamento;
   final Map<String, dynamic> docente;
   final List<Map<String, dynamic>> team;
+  final bool annoCorrente;
+  final String mioRuolo;
 }
 
 class MentoreController extends ChangeNotifier {
   MentoreController({SupabaseClient? client})
-    : _client = client ?? SupabaseConfig.client;
+      : _client = client ?? SupabaseConfig.client;
+
   final SupabaseClient _client;
-  List<PercorsoMentore> percorsi = const [];
+  List<PercorsoMentore> percorsi = const <PercorsoMentore>[];
   PercorsoMentore? selezionato;
+  String? annoCorrente;
   bool caricamento = false;
   bool salvataggio = false;
   String? errore;
 
   Future<void> carica() async {
-    final String? userId = _client.auth.currentUser?.id;
+    final userId = _client.auth.currentUser?.id;
     if (userId == null) return;
+
     caricamento = true;
     errore = null;
     notifyListeners();
+
     try {
-      final List<dynamic> mie = await _client
-          .from('mentoraggio_mentori')
-          .select('mentoraggio_id, tipo')
-          .eq('mentore_id', userId);
-      final List<String> mentoraggioIds = mie
-          .map((e) => e['mentoraggio_id'].toString())
-          .toSet()
-          .toList();
-      if (mentoraggioIds.isEmpty) {
+      final anno = await _client
+          .from('anni_accademici')
+          .select('codice')
+          .eq('corrente', true)
+          .maybeSingle();
+      annoCorrente = anno?['codice']?.toString();
+
+      final mieAssegnazioni = (await _client
+              .from('mentoraggio_mentori')
+              .select('mentoraggio_id, mentore_id, tipo')
+              .eq('mentore_id', userId))
+          .cast<Map<String, dynamic>>();
+      if (mieAssegnazioni.isEmpty) {
         percorsi = const [];
+        selezionato = null;
         return;
       }
-      final List<Map<String, dynamic>> mentoraggi =
-          (await _client
-                  .from('mentoraggi')
-                  .select()
-                  .inFilter('id', mentoraggioIds))
-              .cast<Map<String, dynamic>>();
-      final List<String> insegnamentoIds = mentoraggi
-          .map((m) => m['insegnamento_id'].toString())
-          .toList();
-      final List<Map<String, dynamic>> insegnamenti =
-          (await _client
+
+      final rawMentoraggi = await _client.rpc('mentoraggi_del_mentore');
+      final mentoraggi = (rawMentoraggi as List<dynamic>)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+      final insegnamentoIds = mentoraggi
+          .map((m) => m['insegnamento_id']?.toString())
+          .whereType<String>()
+          .toSet()
+          .toList(growable: false);
+      final insegnamenti = insegnamentoIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : (await _client
                   .from('insegnamenti')
                   .select()
                   .inFilter('id', insegnamentoIds))
               .cast<Map<String, dynamic>>();
-      final List<String> docentiIds = insegnamenti
-          .map((i) => i['docente_id'].toString())
+      final insegnamentiPerId = <String, Map<String, dynamic>>{
+        for (final i in insegnamenti) i['id'].toString(): i,
+      };
+
+      final docentiIds = insegnamenti
+          .map((i) => i['docente_id']?.toString())
+          .whereType<String>()
           .toSet()
-          .toList();
-      final List<Map<String, dynamic>> docenti =
-          (await _client
+          .toList(growable: false);
+      final docenti = docentiIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : (await _client
                   .from('anagrafica')
                   .select('user_id, nome, cognome, email_unipa, cellulare')
                   .inFilter('user_id', docentiIds))
               .cast<Map<String, dynamic>>();
-      final List<Map<String, dynamic>> assegnazioni =
-          (await _client
+      final docentiPerId = <String, Map<String, dynamic>>{
+        for (final d in docenti) d['user_id'].toString(): d,
+      };
+
+      final mentoraggioIds = mentoraggi
+          .map((m) => m['id']?.toString())
+          .whereType<String>()
+          .toList(growable: false);
+      final assegnazioni = mentoraggioIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : (await _client
                   .from('mentoraggio_mentori')
                   .select('mentoraggio_id, mentore_id, tipo')
                   .inFilter('mentoraggio_id', mentoraggioIds))
               .cast<Map<String, dynamic>>();
-      final List<String> teamIds = assegnazioni
-          .map((a) => a['mentore_id'].toString())
+      final teamIds = assegnazioni
+          .map((a) => a['mentore_id']?.toString())
+          .whereType<String>()
           .toSet()
-          .toList();
-      final List<Map<String, dynamic>> personeTeam = teamIds.isEmpty
-          ? const []
-          : (await _client
-                    .from('anagrafica')
-                    .select('user_id, nome, cognome, email_unipa')
-                    .inFilter('user_id', teamIds))
-                .cast<Map<String, dynamic>>();
-      percorsi = mentoraggi
-          .map((m) {
-            final Map<String, dynamic> ins = insegnamenti.firstWhere(
-              (i) => i['id'] == m['insegnamento_id'],
-            );
-            final Map<String, dynamic> docente = docenti.firstWhere(
-              (d) => d['user_id'] == ins['docente_id'],
-              orElse: () => <String, dynamic>{},
-            );
-            final List<Map<String, dynamic>> teamNonOrdinato = assegnazioni
-                .where((a) => a['mentoraggio_id'] == m['id'])
-                .map((a) {
-                  final persona = personeTeam.firstWhere(
-                    (p) => p['user_id'] == a['mentore_id'],
-                    orElse: () => <String, dynamic>{},
-                  );
-                  return <String, dynamic>{...persona, 'tipo': a['tipo']};
-                })
-                .toList(growable: false);
-            final List<Map<String, dynamic>> team = <Map<String, dynamic>>[
-              ...teamNonOrdinato.where(
-                (persona) =>
-                    persona['tipo']?.toString().toLowerCase() != 'senior',
-              ),
-              ...teamNonOrdinato.where(
-                (persona) =>
-                    persona['tipo']?.toString().toLowerCase() == 'senior',
-              ),
-            ];
-            return PercorsoMentore(
-              mentoraggio: m,
-              insegnamento: ins,
-              docente: docente,
-              team: team,
-            );
-          })
           .toList(growable: false);
-      selezionato = percorsi.isEmpty ? null : percorsi.first;
+      final persone = teamIds.isEmpty
+          ? <Map<String, dynamic>>[]
+          : (await _client
+                  .from('anagrafica')
+                  .select('user_id, nome, cognome, email_unipa')
+                  .inFilter('user_id', teamIds))
+              .cast<Map<String, dynamic>>();
+      final personePerId = <String, Map<String, dynamic>>{
+        for (final p in persone) p['user_id'].toString(): p,
+      };
+
+      final risultato = <PercorsoMentore>[];
+      for (final m in mentoraggi) {
+        final ins = insegnamentiPerId[m['insegnamento_id']?.toString()];
+        if (ins == null) continue;
+        final id = m['id']?.toString();
+        final assegnati = assegnazioni
+            .where((a) => a['mentoraggio_id']?.toString() == id)
+            .toList(growable: false);
+        final mia = assegnati.firstWhere(
+          (a) => a['mentore_id']?.toString() == userId,
+          orElse: () => <String, dynamic>{},
+        );
+        final team = assegnati.map((a) {
+          final persona = personePerId[a['mentore_id']?.toString()] ??
+              <String, dynamic>{};
+          return <String, dynamic>{...persona, 'tipo': a['tipo']};
+        }).toList(growable: false)
+          ..sort((a, b) {
+            final seniorA = a['tipo']?.toString().toLowerCase() == 'senior';
+            final seniorB = b['tipo']?.toString().toLowerCase() == 'senior';
+            if (seniorA != seniorB) return seniorA ? 1 : -1;
+            return '${a['cognome'] ?? ''} ${a['nome'] ?? ''}'
+                .compareTo('${b['cognome'] ?? ''} ${b['nome'] ?? ''}');
+          });
+
+        risultato.add(
+          PercorsoMentore(
+            mentoraggio: m,
+            insegnamento: ins,
+            docente: docentiPerId[ins['docente_id']?.toString()] ??
+                <String, dynamic>{},
+            team: team,
+            annoCorrente: m['anno_accademico']?.toString() == annoCorrente,
+            mioRuolo: mia['tipo']?.toString() ?? '',
+          ),
+        );
+      }
+
+      risultato.sort((a, b) {
+        final anno = (b.mentoraggio['anno_accademico']?.toString() ?? '')
+            .compareTo(a.mentoraggio['anno_accademico']?.toString() ?? '');
+        if (anno != 0) return anno;
+        return (a.insegnamento['insegnamento']?.toString() ?? '')
+            .compareTo(b.insegnamento['insegnamento']?.toString() ?? '');
+      });
+
+      percorsi = risultato;
+      if (selezionato == null ||
+          !percorsi.any((p) => p.mentoraggio['id'] == selezionato!.mentoraggio['id'])) {
+        selezionato = percorsi.isEmpty ? null : percorsi.first;
+      } else {
+        selezionato = percorsi.firstWhere(
+          (p) => p.mentoraggio['id'] == selezionato!.mentoraggio['id'],
+        );
+      }
     } catch (e) {
       errore = AppErrorMapper.converti(
         e,
@@ -143,14 +196,40 @@ class MentoreController extends ChangeNotifier {
   }
 
   Future<void> salvaMentoraggio(Map<String, dynamic> valori) async {
-    if (selezionato == null) return;
+    final percorso = selezionato;
+    if (percorso == null || !percorso.annoCorrente) {
+      throw const AppException('Questo mentoraggio e in sola lettura.');
+    }
+
     salvataggio = true;
     notifyListeners();
     try {
-      await _client
-          .from('mentoraggi')
-          .update(valori)
-          .eq('id', selezionato!.mentoraggio['id']);
+      final esclusi = <String>{
+        'id',
+        'insegnamento_id',
+        'anno_accademico',
+        'data_inizio',
+        'data_fine',
+        'numero_studenti',
+        'sede',
+        'note',
+        'svolgimento',
+        'giorni_orari_lezioni',
+        'scheda_sintesi_pdf_url',
+        'created_at',
+        'updated_at',
+      };
+      final patch = <String, dynamic>{
+        for (final entry in valori.entries)
+          if (!esclusi.contains(entry.key)) entry.key: entry.value,
+      };
+      await _client.rpc(
+        'mentoraggio_aggiorna_mentore',
+        params: <String, dynamic>{
+          'p_mentoraggio_id': percorso.mentoraggio['id'],
+          'p_valori': patch,
+        },
+      );
       await carica();
     } catch (e) {
       throw AppErrorMapper.converti(
