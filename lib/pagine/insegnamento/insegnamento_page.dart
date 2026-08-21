@@ -5,6 +5,7 @@ import '../../app_exception.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../../supabase_config.dart';
 
 import 'insegnamento_controller.dart';
 import 'scelta_insegnamento_annuale_controller.dart';
@@ -748,79 +749,220 @@ class _InsegnamentoPageState
   Widget _schedaAnno(
     Map<String, dynamic> mentoraggio,
   ) {
-    final anno =
-        mentoraggio[
-                    'anno_accademico']
-                ?.toString() ??
-            '—';
-
-    final sintesi =
-        mentoraggio[
-                    'scheda_sintesi']
-                ?.toString() ??
-            '';
-
-    final pdf =
-        mentoraggio[
-                    'scheda_sintesi_pdf_url']
-                ?.toString()
-                .trim() ??
-            '';
+    final anno = mentoraggio['anno_accademico']?.toString() ?? '—';
+    final sintesi = mentoraggio['scheda_sintesi']?.toString() ?? '';
+    final azioni = mentoraggio['azioni_miglioramento']?.toString() ?? '';
+    final file = mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
+    final mentoraggioId = mentoraggio['id']?.toString() ?? '';
 
     return Card(
-      margin:
-          const EdgeInsets.only(
-        top: 12,
-      ),
-      child: Padding(
-        padding:
-            const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    anno,
-                    style:
-                        Theme.of(context)
-                            .textTheme
-                            .titleMedium,
+      margin: const EdgeInsets.only(top: 12),
+      child: ExpansionTile(
+        leading: const Icon(Icons.timeline_outlined),
+        title: Text('$anno · ${_controller.selezionato?.insegnamento['insegnamento'] ?? ''}'),
+        subtitle: Text('Stato: ${mentoraggio['stato'] ?? '—'}'),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _controller.risultatiMentoraggio(mentoraggioId),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const LinearProgressIndicator();
+              }
+              if (snapshot.hasError) {
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Risultati questionario non disponibili: ${snapshot.error}'),
+                );
+              }
+              final dati = snapshot.data;
+              final numero = dati?['numero_compilazioni'] ?? 0;
+              final sintesiDomande = (dati?['sintesi'] as List? ?? const [])
+                  .map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList(growable: false);
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Questionario studenti',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-
-                if (pdf.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () =>
-                        _apriPdf(pdf),
-                    icon: const Icon(
-                      Icons
-                          .picture_as_pdf_outlined,
+                  const SizedBox(height: 8),
+                  if (dati == null || dati['questionario_id'] == null)
+                    const Text('Nessun questionario studenti disponibile.')
+                  else ...[
+                    Card(
+                      elevation: 0,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final riga in sintesiDomande)
+                              _rigaSintesiQuestionario(riga),
+                            const Divider(),
+                            Text('Risposte: $numero'),
+                          ],
+                        ),
+                      ),
                     ),
-                    label: const Text(
-                      'Scheda PDF',
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _mostraRisultatiCompleti(dati),
+                          icon: const Icon(Icons.analytics_outlined),
+                          label: const Text('Visualizza risultati completi'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final errore = await _controller
+                                .esportaCsvQuestionarioMentoraggio(mentoraggioId);
+                            if (!mounted || errore == null) return;
+                            _messaggio(errore);
+                          },
+                          icon: const Icon(Icons.download_outlined),
+                          label: const Text('Esporta CSV'),
+                        ),
+                      ],
                     ),
-                  ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            if (sintesi.isEmpty)
-              const Text(
-                'Scheda di sintesi non '
-                'ancora disponibile.',
-              )
-            else
-              TestoHtmlMinimo(
-                testo: sintesi,
+                  ],
+                ],
+              );
+            },
+          ),
+          const Divider(height: 28),
+          Text(
+            'Scheda di sintesi',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          if (sintesi.isEmpty)
+            const Text('Scheda di sintesi non ancora disponibile.')
+          else
+            TestoHtmlMinimo(testo: sintesi),
+          const Divider(height: 28),
+          Text(
+            'Azioni di miglioramento',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(azioni.isEmpty ? '—' : azioni),
+          if (file.isNotEmpty) ...[
+            const Divider(height: 28),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: () => _apriSchedaSintesi(file),
+                icon: const Icon(Icons.description_outlined),
+                label: const Text('Scheda di sintesi PDF/DOCX'),
               ),
+            ),
           ],
-        ),
+        ],
       ),
     );
+  }
+
+  Widget _rigaSintesiQuestionario(Map<String, dynamic> riga) {
+    final tipo = riga['tipo']?.toString() ?? '';
+    String valore;
+    if (tipo == 'scala') {
+      final media = double.tryParse(riga['media']?.toString() ?? '');
+      valore = media == null ? '—' : media.toStringAsFixed(2);
+    } else if (tipo == 'booleano' || tipo == 'scelta_singola') {
+      final frequenze = Map<String, dynamic>.from(riga['frequenze'] as Map? ?? const {});
+      valore = frequenze.entries.map((e) => '${e.key}: ${e.value}').join(' · ');
+      if (valore.isEmpty) valore = '—';
+    } else {
+      valore = '${riga['numero_risposte'] ?? 0} risposte';
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(riga['testo']?.toString() ?? '')),
+          const SizedBox(width: 12),
+          Text(valore),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _mostraRisultatiCompleti(Map<String, dynamic> dati) async {
+    final sintesi = (dati['sintesi'] as List? ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList(growable: false);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Risultati questionario studenti'),
+        content: SizedBox(
+          width: 720,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Text('Compilazioni: ${dati['numero_compilazioni'] ?? 0}'),
+              const SizedBox(height: 12),
+              for (final riga in sintesi) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(riga['testo']?.toString() ?? ''),
+                  subtitle: Text(_descrizioneRisultato(riga)),
+                ),
+                if ((riga['testi'] as List? ?? const []).isNotEmpty)
+                  ...((riga['testi'] as List).map(
+                    (testo) => Padding(
+                      padding: const EdgeInsets.only(left: 16, bottom: 6),
+                      child: Text('• $testo'),
+                    ),
+                  )),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Chiudi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _descrizioneRisultato(Map<String, dynamic> riga) {
+    final tipo = riga['tipo']?.toString() ?? '';
+    if (tipo == 'scala') {
+      final media = double.tryParse(riga['media']?.toString() ?? '');
+      return media == null
+          ? 'Nessuna risposta'
+          : 'Media ${media.toStringAsFixed(2)} · ${riga['numero_risposte'] ?? 0} risposte';
+    }
+    if (tipo == 'booleano' || tipo == 'scelta_singola') {
+      final frequenze = Map<String, dynamic>.from(riga['frequenze'] as Map? ?? const {});
+      return frequenze.entries.map((e) => '${e.key}: ${e.value}').join(' · ');
+    }
+    return '${riga['numero_risposte'] ?? 0} risposte testuali';
+  }
+
+  Future<void> _apriSchedaSintesi(String valore) async {
+    try {
+      final url = valore.startsWith('http://') || valore.startsWith('https://')
+          ? valore
+          : await SupabaseConfig.client.storage
+              .from('schede-sintesi')
+              .createSignedUrl(valore, 3600);
+      await _apriPdf(url);
+    } catch (e) {
+      _messaggio('Impossibile aprire la scheda di sintesi: $e');
+    }
   }
 
   // ============================================================

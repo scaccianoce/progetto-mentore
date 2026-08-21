@@ -30,171 +30,165 @@ class _PartecipantiBackofficePageState
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Partecipanti · dati da anagrafica + anagrafica_riservata',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Aggiorna',
-                  onPressed: controller.caricamento ? null : controller.carica,
-                  icon: const Icon(Icons.refresh),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: () => _nuovo(context),
-                  icon: const Icon(Icons.person_add_alt_1),
-                  label: const Text('Nuovo partecipante'),
-                ),
-                if (controller.soloOwner) ...[
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: controller.caricamento
-                        ? null
-                        : () => _importaPartecipanti(context),
-                    icon: const Icon(
-                      Icons.upload_file_outlined,
+  Widget build(BuildContext context) => LayoutBuilder(
+        builder: (context, vincoli) {
+          final mobile = vincoli.maxWidth < 760;
+
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: mobile ? vincoli.maxWidth - 24 : 420,
+                      child: Text(
+                        'Partecipanti · dati da anagrafica + anagrafica_riservata',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
                     ),
-                    label: const Text(
-                      'Importa partecipanti',
+                    IconButton(
+                      tooltip: 'Aggiorna',
+                      onPressed:
+                          controller.caricamento ? null : controller.carica,
+                      icon: const Icon(Icons.refresh),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _nuovo(context),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Nuovo partecipante'),
+                    ),
+                    if (controller.soloOwner)
+                      OutlinedButton.icon(
+                        onPressed: controller.caricamento
+                            ? null
+                            : () => _importaPartecipanti(context),
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Importa partecipanti'),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: controller.partecipanti.length,
+                  itemBuilder: (context, i) =>
+                      _schedaPartecipante(controller.partecipanti[i]),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
+  Widget _schedaPartecipante(Map<String, dynamic> p) {
+    final id = p['user_id'].toString();
+    final riservato = controller.riservati[id];
+    final ruolo = controller.ruoli[id];
+
+    return Card(
+      child: ExpansionTile(
+        leading: Icon(
+          riservato?['attivo'] == false
+              ? Icons.person_off_outlined
+              : Icons.person_outline,
+        ),
+        title: Text('${p['cognome'] ?? ''} ${p['nome'] ?? ''}'.trim()),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${p['email_unipa'] ?? ''}'
+              '${ruolo == null ? '' : ' · $ruolo'}',
+            ),
+            if (controller.annoPreparazione != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'Partecipazione ${controller.annoPreparazione}: '
+                  '${_etichettaStatoPartecipazione(controller.statoPartecipazione(id, controller.annoPreparazione!))}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            if (controller.annoGestioneInsegnamenti != null)
+              Row(
+                children: [
+                  Switch.adaptive(
+                    value: controller.gestioneInsegnamentiAttiva(id),
+                    onChanged: controller.caricamento
+                        ? null
+                        : (abilita) => _impostaGestioneInsegnamenti(
+                              context,
+                              id,
+                              abilita,
+                            ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Inserisci/modifica insegnamenti · '
+                      '${controller.annoGestioneInsegnamenti}',
                     ),
                   ),
                 ],
+              ),
+          ],
+        ),
+        trailing: IconButton(
+          tooltip: 'Modifica / elimina',
+          onPressed: () => _azioni(context, p, riservato),
+          icon: const Icon(Icons.edit_outlined),
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          _SezioneDati(titolo: 'Anagrafica', dati: p),
+          const SizedBox(height: 12),
+          _SezioneDati(
+            titolo: 'Anagrafica riservata',
+            dati: riservato ?? const <String, dynamic>{},
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _modificaAnagrafica(context, p),
+                  icon: const Icon(Icons.badge_outlined),
+                  label: const Text('Modifica anagrafica'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _modificaRiservati(
+                    context,
+                    p,
+                    riservato,
+                  ),
+                  icon: const Icon(Icons.lock_outline),
+                  label: const Text('Modifica dati riservati'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _apriInsegnamenti(context, p),
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: const Text('Insegnamenti'),
+                ),
               ],
             ),
           ),
-          Expanded(
-            child: Scrollbar(
-              controller: _orizzontale,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: _orizzontale,
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: 1250,
-                  child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: controller.partecipanti.length,
-              itemBuilder: (context, i) {
-                final p = controller.partecipanti[i];
-                final id = p['user_id'].toString();
-                final riservato = controller.riservati[id];
-                final ruolo = controller.ruoli[id];
-                return Card(
-                  child: ExpansionTile(
-                    leading: Icon(
-                      riservato?['attivo'] == false
-                          ? Icons.person_off_outlined
-                          : Icons.person_outline,
-                    ),
-                    title: Text('${p['cognome'] ?? ''} ${p['nome'] ?? ''}'.trim()),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${p['email_unipa'] ?? ''}'
-                          '${ruolo == null ? '' : ' · $ruolo'}',
-                        ),
-                        if (controller.annoPreparazione != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Partecipazione ${controller.annoPreparazione}: '
-                              '${_etichettaStatoPartecipazione(controller.statoPartecipazione(id, controller.annoPreparazione!))}',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        if (controller.annoGestioneInsegnamenti != null)
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Switch.adaptive(
-                                value: controller.gestioneInsegnamentiAttiva(id),
-                                onChanged: controller.caricamento
-                                    ? null
-                                    : (abilita) =>
-                                        _impostaGestioneInsegnamenti(
-                                          context,
-                                          id,
-                                          abilita,
-                                        ),
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  'Inserisci/modifica insegnamenti · '
-                                  '${controller.annoGestioneInsegnamenti}',
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                    trailing: IconButton(
-                      tooltip: 'Modifica / elimina',
-                      onPressed: () => _azioni(context, p, riservato),
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    children: [
-                      _SezioneDati(titolo: 'Anagrafica', dati: p),
-                      const SizedBox(height: 12),
-                      _SezioneDati(
-                        titolo: 'Anagrafica riservata',
-                        dati: riservato ?? const <String, dynamic>{},
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: () => _modificaAnagrafica(context, p),
-                              icon: const Icon(Icons.badge_outlined),
-                              label: const Text('Modifica anagrafica'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: () => _modificaRiservati(
-                                context,
-                                p,
-                                riservato,
-                              ),
-                              icon: const Icon(Icons.lock_outline),
-                              label: const Text('Modifica dati riservati'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: () => _apriInsegnamenti(context, p),
-                              icon: const Icon(Icons.menu_book_outlined),
-                              label: const Text('Insegnamenti'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text('Ruolo applicativo: ${ruolo ?? '—'}'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-                    ),
-                ),
-              ),
-            ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Ruolo applicativo: ${ruolo ?? '—'}'),
           ),
         ],
-      );
+      ),
+    );
+  }
 
 
   void _apriInsegnamenti(

@@ -90,6 +90,13 @@ abstract final class AppMenuController {
       ruoli: _tutti,
     ),
     VoceMenu(
+      titolo: 'Risorse per il mentoring',
+      icona: Icons.folder_copy_outlined,
+      percorso: '/risorse-mentoring',
+      sezione: MenuSezione.mentoraggio,
+      ruoli: _tutti,
+    ),
+    VoceMenu(
       titolo: 'Eventi',
       icona: Icons.event_outlined,
       percorso: '/eventi',

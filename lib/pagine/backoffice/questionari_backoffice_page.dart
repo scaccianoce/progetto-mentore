@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'questionari_controller.dart';
+import 'questionario_risultati_card.dart';
 
 class QuestionariBackofficePage extends StatefulWidget {
   const QuestionariBackofficePage({
@@ -59,12 +60,30 @@ class _QuestionariBackofficePageState
             const SizedBox(height: 8),
             const Text(
               'I template per i partecipanti alimentano i questionari interni '
-              'agli eventi. I template per gli studenti vengono utilizzati '
-              'come traccia per i Google Form associati ai mentoraggi.',
+              'agli eventi. I template per gli studenti generano questionari '
+              'pubblici anonimi associati ai mentoraggi.',
             ),
             const SizedBox(height: 20),
             for (final template in controller.template)
               _schedaTemplate(context, template),
+            const SizedBox(height: 28),
+            Text(
+              'Somministrazioni e risultati',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'I risultati sono visibili soltanto a owner e organizer. '
+              'Apri una card per vedere la sintesi ed esportare il CSV.',
+            ),
+            const SizedBox(height: 14),
+            if (controller.questionari.isEmpty)
+              const Text('Nessun questionario somministrato.'),
+            for (final questionario in controller.questionari)
+              QuestionarioRisultatiCard(
+                controller: controller,
+                questionario: questionario,
+              ),
           ],
         );
       },

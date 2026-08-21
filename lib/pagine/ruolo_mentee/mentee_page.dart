@@ -5,6 +5,7 @@ import '../../app_exception.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../../supabase_config.dart';
 import '../template/componenti_pagina_dinamica.dart';
 import '../template/template_elenco_dettaglio_page.dart';
 import 'mentee_controller.dart';
@@ -126,32 +127,57 @@ class _MenteePageState extends State<MenteePage> {
         ),
         const Divider(),
       ],
-      dopo: _linkPdf(percorso.mentoraggio),
+      dopo: <Widget>[
+        ..._linkPdf(percorso.mentoraggio),
+      ],
     );
   }
 
-  List<Widget> _linkPdf(Map<String, dynamic> mentoraggio) {
-    final url = mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
-    if (url.isEmpty) return const <Widget>[];
+
+  List<Widget> _linkPdf(
+    Map<String, dynamic> mentoraggio,
+  ) {
+    final valore =
+        mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
+
+    if (valore.isEmpty) {
+      return const <Widget>[];
+    }
+
+    final nomeFile = valore.split('/').last;
+
     return <Widget>[
-      const Divider(height: 28),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _apriPdf(url),
-          icon: const Icon(Icons.picture_as_pdf_outlined),
-          label: const Text('Apri scheda di sintesi PDF'),
+      Card(
+        margin: const EdgeInsets.only(top: 12),
+        child: ListTile(
+          leading: const Icon(Icons.description_outlined),
+          title: const Text('Scheda di sintesi'),
+          subtitle: Text(
+            nomeFile.isEmpty ? 'Documento disponibile' : nomeFile,
+          ),
+          trailing: const Icon(Icons.open_in_new),
+          onTap: () => _apriPdf(valore),
         ),
       ),
     ];
   }
 
-  Future<void> _apriPdf(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+  Future<void> _apriPdf(String valore) async {
+    try {
+      final url = valore.startsWith('http://') || valore.startsWith('https://')
+          ? valore
+          : await SupabaseConfig.client.storage
+              .from('schede-sintesi')
+              .createSignedUrl(valore, 3600);
+      final uri = Uri.tryParse(url);
+      if (uri == null ||
+          !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw Exception('URL non apribile');
+      }
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossibile aprire il PDF.')),
+        const SnackBar(content: Text('Impossibile aprire la scheda di sintesi.')),
       );
     }
   }

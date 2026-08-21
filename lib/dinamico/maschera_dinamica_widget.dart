@@ -15,6 +15,7 @@ Future<Map<String, dynamic>?> mostraMascheraDinamica({
   bool partecipante = false,
   bool mostraCampiSolaLettura = false,
   String? titolo,
+  Widget? contenutoExtra,
 }) async {
   assert(
     configurazione != null || tabella != null,
@@ -49,6 +50,7 @@ Future<Map<String, dynamic>?> mostraMascheraDinamica({
       partecipante: partecipante,
       mostraCampiSolaLettura: mostraCampiSolaLettura,
       titolo: titolo,
+      contenutoExtra: contenutoExtra,
     ),
   );
 }
@@ -258,6 +260,7 @@ class MascheraDinamica extends StatefulWidget {
     this.partecipante = false,
     this.mostraCampiSolaLettura = false,
     this.titolo,
+    this.contenutoExtra,
   });
 
   final TabellaDatabase tabella;
@@ -265,6 +268,7 @@ class MascheraDinamica extends StatefulWidget {
   final bool partecipante;
   final bool mostraCampiSolaLettura;
   final String? titolo;
+  final Widget? contenutoExtra;
 
   @override
   State<MascheraDinamica> createState() => _MascheraDinamicaState();
@@ -371,7 +375,13 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _costruisciCampi(),
+            children: <Widget>[
+              ..._costruisciCampi(),
+              if (widget.contenutoExtra != null) ...[
+                const Divider(height: 28),
+                widget.contenutoExtra!,
+              ],
+            ],
           ),
         ),
       ),

@@ -463,11 +463,6 @@ class _ControlloPartecipantiBackofficePageState
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: const Text('Apri PDF'),
                   ),
-                OutlinedButton.icon(
-                  onPressed: () => _modificaPdfMentoraggio(m),
-                  icon: const Icon(Icons.link_outlined),
-                  label: const Text('Modifica link PDF'),
-                ),
               ],
             ),
           ],
@@ -778,63 +773,6 @@ class _ControlloPartecipantiBackofficePageState
     }
   }
 
-  Future<void> _modificaPdfMentoraggio(Map<String, dynamic> mentoraggio) async {
-    final controller = TextEditingController(
-      text: mentoraggio['scheda_sintesi_pdf_url']?.toString() ?? '',
-    );
-    final salva = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Scheda di sintesi PDF'),
-            content: SizedBox(
-              width: 560,
-              child: TextField(
-                controller: controller,
-                decoration: const InputDecoration(
-                  labelText: 'URL PDF',
-                  hintText: 'https://...',
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Annulla'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Salva'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!salva) {
-      controller.dispose();
-      return;
-    }
-    try {
-      await SupabaseConfig.client.rpc(
-        'mentoraggio_aggiorna_backoffice',
-        params: <String, dynamic>{
-          'p_mentoraggio_id': mentoraggio['id'],
-          'p_valori': <String, dynamic>{
-            'scheda_sintesi_pdf_url': controller.text.trim().isEmpty
-                ? null
-                : controller.text.trim(),
-          },
-        },
-      );
-      await _carica();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossibile salvare il link PDF: $e')),
-      );
-    } finally {
-      controller.dispose();
-    }
-  }
 
   Widget _titolo(String testo) => Align(
         alignment: Alignment.centerLeft,

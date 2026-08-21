@@ -1,19 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'app_config.dart';
 import 'dinamico/maschera_dinamica_controller.dart';
 
 /// Configurazione unica della connessione a Supabase.
 abstract final class SupabaseConfig {
   static SchemaDatabase? _schemaDatabase;
   static Future<SchemaDatabase>? _caricamentoSchema;
-  static const String url = String.fromEnvironment(
-    'SUPABASE_URL',
-    defaultValue: 'https://dwzmuxlwndsctkhrmuzt.supabase.co',
-  );
-  static const String publishableKey = String.fromEnvironment(
-    'SUPABASE_PUBLISHABLE_KEY',
-    defaultValue: 'sb_publishable_jgZAFuXc36RinuKub400zw_hFog6atv',
-  );
+  static const String url = AppConfig.supabaseUrl;
+  static const String publishableKey = AppConfig.supabasePublishableKey;
 
   /// Inizializza Supabase prima dell'avvio dell'app.
   static Future<void> inizializza() async {

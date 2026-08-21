@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app_exception.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
 import '../../sessione_controller.dart';
+import '../backoffice/questionari_controller.dart';
+import '../backoffice/questionario_mentoraggio_widget.dart';
+import '../backoffice/scheda_sintesi_file_card.dart';
 import '../template/componenti_pagina_dinamica.dart';
 import '../template/template_elenco_dettaglio_page.dart';
 import 'mentore_controller.dart';
@@ -29,6 +31,9 @@ class _MentorePageState extends State<MentorePage> {
       'numero_studenti': PersonalizzazioneCampo(modificabilePartecipante: false),
       'sede': PersonalizzazioneCampo(modificabilePartecipante: false),
       'note': PersonalizzazioneCampo(modificabilePartecipante: false),
+      'azioni_miglioramento': PersonalizzazioneCampo(
+        etichetta: 'Azioni di miglioramento',
+      ),
       'svolgimento': PersonalizzazioneCampo(modificabilePartecipante: false),
       'giorni_orari_lezioni': PersonalizzazioneCampo(modificabilePartecipante: false),
       'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
@@ -36,16 +41,19 @@ class _MentorePageState extends State<MentorePage> {
   );
 
   late final MentoreController controller;
+  late final QuestionariController questionariController;
 
   @override
   void initState() {
     super.initState();
     controller = MentoreController()..carica();
+    questionariController = QuestionariController(widget.sessione)..carica();
   }
 
   @override
   void dispose() {
     controller.dispose();
+    questionariController.dispose();
     super.dispose();
   }
 
@@ -141,39 +149,21 @@ class _MentorePageState extends State<MentorePage> {
         ),
         const Divider(),
       ],
-      dopo: _linkPdf(percorso.mentoraggio),
-    );
-  }
-
-  List<Widget> _linkPdf(Map<String, dynamic> mentoraggio) {
-    final url = mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
-    if (url.isEmpty) return const <Widget>[];
-    return <Widget>[
-      const Divider(height: 28),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          onPressed: () => _apriPdf(url),
-          icon: const Icon(Icons.picture_as_pdf_outlined),
-          label: const Text('Apri scheda di sintesi PDF'),
+      dopo: <Widget>[
+        const Divider(height: 28),
+        SchedaSintesiFileCard(
+          mentoraggio: percorso.mentoraggio,
+          onAggiornato: controller.carica,
         ),
-      ),
-    ];
-  }
-
-  Future<void> _apriPdf(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossibile aprire il PDF.')),
-      );
-    }
+      ],
+    );
   }
 
   Future<void> _modifica() async {
     final percorso = controller.selezionato;
     if (percorso == null || !percorso.annoCorrente) return;
+    await questionariController.carica();
+    if (!mounted) return;
     final valori = await mostraMascheraDinamica(
       context: context,
       configurazione: configurazione,
@@ -181,6 +171,20 @@ class _MentorePageState extends State<MentorePage> {
       partecipante: true,
       titolo:
           'Aggiorna ${percorso.insegnamento['insegnamento'] ?? ''} · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
+      contenutoExtra: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          QuestionarioMentoraggioCard(
+            controller: questionariController,
+            mentoraggioId: percorso.mentoraggio['id'].toString(),
+          ),
+          const SizedBox(height: 12),
+          SchedaSintesiFileCard(
+            mentoraggio: percorso.mentoraggio,
+            onAggiornato: controller.carica,
+          ),
+        ],
+      ),
     );
     if (valori == null) return;
     try {

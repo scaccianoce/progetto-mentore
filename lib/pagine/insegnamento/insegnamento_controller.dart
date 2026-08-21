@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../app_exception.dart';
@@ -21,6 +24,9 @@ class InsegnamentoController extends ChangeNotifier {
   bool _salvataggio = false;
 
   String? _errore;
+
+  final Map<String, Map<String, dynamic>?> _risultatiQuestionari =
+      <String, Map<String, dynamic>?>{};
 
   List<InsegnamentoStorico> get insegnamenti =>
       _insegnamenti;
@@ -280,6 +286,98 @@ class InsegnamentoController extends ChangeNotifier {
     } finally {
       _salvataggio = false;
       notifyListeners();
+    }
+  }
+
+  // ============================================================
+  // RISULTATI QUESTIONARIO STUDENTI / STORICO
+  // ============================================================
+
+  Future<Map<String, dynamic>?> risultatiMentoraggio(
+    String mentoraggioId, {
+    bool forza = false,
+  }) async {
+    if (!forza && _risultatiQuestionari.containsKey(mentoraggioId)) {
+      return _risultatiQuestionari[mentoraggioId];
+    }
+
+    final raw = await SupabaseConfig.client.rpc(
+      'questionario_risultati_mentoraggio',
+      params: {'p_mentoraggio_id': mentoraggioId},
+    );
+
+    final risultato = raw == null
+        ? null
+        : Map<String, dynamic>.from(raw as Map);
+    _risultatiQuestionari[mentoraggioId] = risultato;
+    return risultato;
+  }
+
+  Future<String?> esportaCsvQuestionarioMentoraggio(
+    String mentoraggioId,
+  ) async {
+    try {
+      final dati = await risultatiMentoraggio(
+        mentoraggioId,
+        forza: true,
+      );
+      if (dati == null || dati['questionario_id'] == null) {
+        throw const AppException(
+          'Nessun questionario studenti disponibile.',
+        );
+      }
+
+      final domande = (dati['domande'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+      final compilazioni = (dati['compilazioni'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+      final risposte = (dati['risposte'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+
+      String csv(Object? valore) {
+        final testo = valore?.toString() ?? '';
+        return '"${testo.replaceAll('"', '""')}"';
+      }
+
+      final buffer = StringBuffer('data_compilazione');
+      for (final domanda in domande) {
+        buffer.write(',${csv(domanda['testo'])}');
+      }
+      buffer.writeln();
+
+      for (final compilazione in compilazioni) {
+        buffer.write(csv(compilazione['inviato_at']));
+        for (final domanda in domande) {
+          Object? valore;
+          for (final risposta in risposte) {
+            if (risposta['compilazione_id']?.toString() ==
+                    compilazione['id']?.toString() &&
+                risposta['domanda_id']?.toString() ==
+                    domanda['id']?.toString()) {
+              valore = risposta['valore'];
+              break;
+            }
+          }
+          buffer.write(',${csv(valore)}');
+        }
+        buffer.writeln();
+      }
+
+      await FilePicker.saveFile(
+        dialogTitle: 'Esporta risultati questionario',
+        fileName: 'questionario_${mentoraggioId}_risultati.csv',
+        bytes: Uint8List.fromList(utf8.encode(buffer.toString())),
+        mimeType: 'text/csv',
+      );
+      return null;
+    } catch (e) {
+      return AppErrorMapper.converti(
+        e,
+        messaggioGenerico: 'Impossibile esportare i risultati.',
+      ).messaggio;
     }
   }
 

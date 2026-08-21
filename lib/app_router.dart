@@ -12,6 +12,7 @@ import 'pagine/backoffice/notifiche_backoffice_page.dart';
 import 'pagine/backoffice/partecipanti_backoffice_page.dart';
 import 'pagine/backoffice/questionari_backoffice_page.dart';
 import 'pagine/backoffice/questionari_controller.dart';
+import 'pagine/backoffice/questionario_pubblico_page.dart';
 import 'pagine/contatti/contatti_page.dart';
 import 'pagine/eventi/eventi_page.dart';
 import 'pagine/house_of_mentore/house_of_mentore_page.dart';
@@ -22,13 +23,19 @@ import 'pagine/notifiche/notifiche_page.dart';
 import 'pagine/profilo/profilo_page.dart';
 import 'pagine/ruolo_mentee/mentee_page.dart';
 import 'pagine/ruolo_mentore/mentore_page.dart';
+import 'pagine/risorse_mentoring/risorse_mentoring_page.dart';
 import 'sessione_controller.dart';
 
 GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
   initialLocation: '/news',
   refreshListenable: sessione,
   redirect: (BuildContext context, GoRouterState stato) {
-    final login = stato.uri.path == '/login';
+    final path = stato.uri.path;
+    final login = path == '/login';
+
+    // La compilazione del questionario studenti e pubblica: non richiede
+    // sessione, ruolo o menu autenticato.
+    if (path == '/q' || path.startsWith('/q/')) return null;
     if (!sessione.autenticato) return login ? null : '/login';
     if (!sessione.pronto) return null;
     if (login) return '/news';
@@ -45,6 +52,12 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
       path: '/login',
       builder: (context, state) => SelectionArea(
         child: LoginPage(sessione: sessione),
+      ),
+    ),
+    GoRoute(
+      path: '/q/:token',
+      builder: (_, state) => QuestionarioPubblicoPage(
+        token: state.pathParameters['token'] ?? '',
       ),
     ),
     ShellRoute(
@@ -76,6 +89,10 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
         GoRoute(
           path: '/mentore',
           builder: (_, _) => MentorePage(sessione: sessione),
+        ),
+        GoRoute(
+          path: '/risorse-mentoring',
+          builder: (_, _) => RisorseMentoringPage(sessione: sessione),
         ),
         GoRoute(
           path: '/eventi',

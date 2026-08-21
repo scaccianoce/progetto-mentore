@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../app_config.dart';
 import '../../app_exception.dart';
 import '../../sessione_controller.dart';
 import '../../supabase_config.dart';
@@ -305,7 +309,7 @@ class QuestionariController extends ChangeNotifier {
           );
         }
 
-        await SupabaseConfig.client
+        final creato = await SupabaseConfig.client
             .from('questionari')
             .insert({
               'template_id': templateId,
@@ -317,7 +321,34 @@ class QuestionariController extends ChangeNotifier {
             })
             .select('id, token_pubblico')
             .single();
+
+        final token = creato['token_pubblico']?.toString().trim();
+        if (token == null || token.isEmpty) {
+          throw const AppException(
+            'Token pubblico del questionario non restituito.',
+          );
+        }
+
+        final url = _urlDaToken(token);
+
+        // Copia automaticamente il link nel mentoraggio. Il campo resta
+        // comunque modificabile dalla normale maschera mentoraggio.
+        await SupabaseConfig.client.rpc(
+          'questionario_mentoraggio_link_imposta',
+          params: {
+            'p_mentoraggio_id': mentoraggioId,
+            'p_url': url,
+          },
+        );
       });
+
+  String _urlDaToken(String token) {
+    final configurato = AppConfig.publicAppUrl;
+    final base = configurato.trim().isNotEmpty
+        ? configurato.trim().replaceFirst(RegExp(r'/$'), '')
+        : Uri.base.origin;
+    return '$base/q/$token';
+  }
 
   String? urlQuestionarioPubblico(
     Map<String, dynamic> questionario,
@@ -329,8 +360,7 @@ class QuestionariController extends ChangeNotifier {
       return null;
     }
 
-    const configurato =
-        String.fromEnvironment('PUBLIC_APP_URL');
+    final configurato = AppConfig.publicAppUrl;
 
     final base = configurato.trim().isNotEmpty
         ? configurato.trim().replaceFirst(RegExp(r'/$'), '')
@@ -338,6 +368,202 @@ class QuestionariController extends ChangeNotifier {
 
     return '$base/q/$token';
   }
+
+
+Future<int> contaCompilazioni(String questionarioId) async {
+  final righe = await SupabaseConfig.client
+      .from('questionari_compilazioni')
+      .select('id')
+      .eq('questionario_id', questionarioId);
+  return (righe as List).length;
+}
+
+/// Cancellazione amministrativa consentita solo finché non esistono risposte.
+Future<String?> eliminaQuestionarioMentoraggio(String questionarioId) =>
+    _esegui(() async {
+      if (!puoGestire) {
+        throw const AppException('Operazione non autorizzata.');
+      }
+      final numero = await contaCompilazioni(questionarioId);
+      if (numero > 0) {
+        throw const AppException(
+          'Il questionario non può essere cancellato perché sono già presenti risposte.',
+        );
+      }
+      final q = await SupabaseConfig.client
+          .from('questionari')
+          .select('mentoraggio_id')
+          .eq('id', questionarioId)
+          .maybeSingle();
+
+      await SupabaseConfig.client
+          .from('questionari')
+          .delete()
+          .eq('id', questionarioId);
+
+      final mentoraggioId = q?['mentoraggio_id']?.toString();
+      if (mentoraggioId != null && mentoraggioId.isNotEmpty) {
+        await SupabaseConfig.client.rpc(
+          'questionario_mentoraggio_link_imposta',
+          params: {
+            'p_mentoraggio_id': mentoraggioId,
+            'p_url': '',
+          },
+        );
+      }
+    });
+
+Future<Map<String, dynamic>> caricaRisultatiQuestionario(
+  String questionarioId,
+) async {
+  if (!puoGestire) {
+    throw const AppException('Operazione non autorizzata.');
+  }
+
+  final q = await SupabaseConfig.client
+      .from('questionari')
+      .select('id, titolo, template_id, provider, evento_id, mentoraggio_id')
+      .eq('id', questionarioId)
+      .single();
+
+  final domande = (await SupabaseConfig.client
+          .from('questionari_domande')
+          .select('id, ordine, testo, tipo, opzioni')
+          .eq('template_id', q['template_id'])
+          .order('ordine'))
+      .cast<Map<String, dynamic>>();
+
+  final compilazioni = (await SupabaseConfig.client
+          .from('questionari_compilazioni')
+          .select('id, user_id, inviato_at')
+          .eq('questionario_id', questionarioId)
+          .order('inviato_at'))
+      .cast<Map<String, dynamic>>();
+
+  final ids = compilazioni.map((e) => e['id'].toString()).toList();
+  final risposte = ids.isEmpty
+      ? <Map<String, dynamic>>[]
+      : (await SupabaseConfig.client
+              .from('questionari_risposte')
+              .select('compilazione_id, domanda_id, valore')
+              .inFilter('compilazione_id', ids))
+          .cast<Map<String, dynamic>>();
+
+  final sintesi = <Map<String, dynamic>>[];
+  for (final domanda in domande) {
+    final valori = risposte
+        .where((r) => r['domanda_id']?.toString() == domanda['id'].toString())
+        .map((r) => r['valore'])
+        .where((v) => v != null)
+        .toList(growable: false);
+    sintesi.add(_sintesiDomanda(domanda, valori));
+  }
+
+  return {
+    'questionario': Map<String, dynamic>.from(q),
+    'numero_compilazioni': compilazioni.length,
+    'domande': domande,
+    'compilazioni': compilazioni,
+    'risposte': risposte,
+    'sintesi': sintesi,
+  };
+}
+
+Map<String, dynamic> _sintesiDomanda(
+  Map<String, dynamic> domanda,
+  List<dynamic> valori,
+) {
+  final tipo = domanda['tipo']?.toString() ?? '';
+  if (tipo == 'scala') {
+    final numeri = valori
+        .map((v) => double.tryParse(v.toString()))
+        .whereType<double>()
+        .toList();
+    return {
+      ...domanda,
+      'numero_risposte': numeri.length,
+      'media': numeri.isEmpty
+          ? null
+          : numeri.reduce((a, b) => a + b) / numeri.length,
+    };
+  }
+
+  if (tipo == 'booleano' || tipo == 'scelta_singola') {
+    final frequenze = <String, int>{};
+    for (final valore in valori) {
+      final chiave = valore is bool
+          ? (valore ? 'Sì' : 'No')
+          : valore.toString();
+      frequenze[chiave] = (frequenze[chiave] ?? 0) + 1;
+    }
+    return {
+      ...domanda,
+      'numero_risposte': valori.length,
+      'frequenze': frequenze,
+    };
+  }
+
+  return {
+    ...domanda,
+    'numero_risposte': valori.length,
+    'testi': valori.map((v) => v.toString()).toList(growable: false),
+  };
+}
+
+Future<String?> esportaCsvRisultati(String questionarioId) async {
+  try {
+    final dati = await caricaRisultatiQuestionario(questionarioId);
+    final domande = (dati['domande'] as List).cast<Map<String, dynamic>>();
+    final compilazioni =
+        (dati['compilazioni'] as List).cast<Map<String, dynamic>>();
+    final risposte = (dati['risposte'] as List).cast<Map<String, dynamic>>();
+
+    String csvCampo(Object? valore) {
+      final testo = valore?.toString() ?? '';
+      return '"${testo.replaceAll('"', '""')}"';
+    }
+
+    final buffer = StringBuffer();
+    buffer.write('data_compilazione');
+    for (final domanda in domande) {
+      buffer.write(',${csvCampo(domanda['testo'])}');
+    }
+    buffer.writeln();
+
+    for (final compilazione in compilazioni) {
+      buffer.write(csvCampo(compilazione['inviato_at']));
+      for (final domanda in domande) {
+        Map<String, dynamic>? risposta;
+        for (final riga in risposte) {
+          if (riga['compilazione_id']?.toString() ==
+                  compilazione['id'].toString() &&
+              riga['domanda_id']?.toString() == domanda['id'].toString()) {
+            risposta = riga;
+            break;
+          }
+        }
+        buffer.write(',${csvCampo(risposta?['valore'])}');
+      }
+      buffer.writeln();
+    }
+
+    final titolo = (dati['questionario'] as Map)['titolo']
+        ?.toString()
+        .replaceAll(RegExp(r'[^A-Za-z0-9_-]+'), '_');
+    await FilePicker.saveFile(
+      dialogTitle: 'Esporta risultati questionario',
+      fileName: '${titolo ?? 'questionario'}_risultati.csv',
+      bytes: Uint8List.fromList(utf8.encode(buffer.toString())),
+      mimeType: 'text/csv',
+    );
+    return null;
+  } catch (e) {
+    return AppErrorMapper.converti(
+      e,
+      messaggioGenerico: 'Impossibile esportare i risultati CSV.',
+    ).messaggio;
+  }
+}
 
   Future<String?> eliminaQuestionario(String id) =>
       _esegui(() async {

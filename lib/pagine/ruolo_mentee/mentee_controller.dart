@@ -10,12 +10,14 @@ class PercorsoMentee {
     required this.mentoraggio,
     required this.mentori,
     required this.annoCorrente,
+    required this.sintesiQuestionario,
   });
 
   final Map<String, dynamic> insegnamento;
   final Map<String, dynamic> mentoraggio;
   final List<Map<String, dynamic>> mentori;
   final bool annoCorrente;
+  final Map<String, dynamic>? sintesiQuestionario;
 }
 
 class MenteeController extends ChangeNotifier {
@@ -113,6 +115,21 @@ class MenteeController extends ChangeNotifier {
                 .compareTo('${b['cognome'] ?? ''} ${b['nome'] ?? ''}');
           });
 
+        Map<String, dynamic>? sintesiQuestionario;
+        try {
+          final rawSintesi = await _client.rpc(
+            'questionario_sintesi_mentoraggio',
+            params: <String, dynamic>{
+              'p_mentoraggio_id': mentoraggio['id'],
+            },
+          );
+          if (rawSintesi is Map) {
+            sintesiQuestionario = Map<String, dynamic>.from(rawSintesi);
+          }
+        } catch (_) {
+          // La timeline resta disponibile anche se non esiste un questionario.
+        }
+
         risultato.add(
           PercorsoMentee(
             insegnamento: insegnamento,
@@ -120,6 +137,7 @@ class MenteeController extends ChangeNotifier {
             mentori: team,
             annoCorrente:
                 mentoraggio['anno_accademico']?.toString() == annoCorrente,
+            sintesiQuestionario: sintesiQuestionario,
           ),
         );
       }

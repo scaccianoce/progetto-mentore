@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/maschera_dinamica_widget.dart';
 import 'backoffice_controller.dart';
+import 'questionari_controller.dart';
+import 'questionario_mentoraggio_widget.dart';
+import 'questionario_risultati_card.dart';
+import 'scheda_sintesi_file_card.dart';
 
 /// Gestione centralizzata di:
 /// insegnamenti -> mentoraggi -> mentoraggio_mentori.
@@ -25,6 +29,7 @@ class _InsegnamentiBackofficePageState
     extends State<InsegnamentiBackofficePage> {
   final _filtro = TextEditingController();
   String? _docenteId;
+  late final QuestionariController questionariController;
 
   BackofficeController get controller => widget.controller;
 
@@ -43,6 +48,10 @@ class _InsegnamentiBackofficePageState
       'id': PersonalizzazioneCampo(nascosto: true),
       'insegnamento_id': PersonalizzazioneCampo(solaLettura: true),
       'anno_accademico': PersonalizzazioneCampo(solaLettura: true),
+      'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
+      'azioni_miglioramento': PersonalizzazioneCampo(
+        etichetta: 'Azioni di miglioramento',
+      ),
     },
   );
 
@@ -50,6 +59,7 @@ class _InsegnamentiBackofficePageState
   void initState() {
     super.initState();
     _docenteId = widget.docenteIdIniziale;
+    questionariController = QuestionariController(controller.sessione)..carica();
     _filtro.addListener(_ridisegna);
   }
 
@@ -57,6 +67,7 @@ class _InsegnamentiBackofficePageState
   void dispose() {
     _filtro.removeListener(_ridisegna);
     _filtro.dispose();
+    questionariController.dispose();
     super.dispose();
   }
 
@@ -71,9 +82,13 @@ class _InsegnamentiBackofficePageState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
+            ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 220, maxWidth: 520),
               child: Text(
                 'Insegnamenti · mentoraggi · team',
                 style: Theme.of(context).textTheme.titleLarge,
@@ -84,26 +99,19 @@ class _InsegnamentiBackofficePageState
               onPressed: controller.caricamento ? null : controller.carica,
               icon: const Icon(Icons.refresh),
             ),
-            const SizedBox(width: 8),
             FilledButton.icon(
               onPressed: controller.caricamento ? null : _nuovoInsegnamento,
               icon: const Icon(Icons.add),
               label: const Text('Nuovo insegnamento'),
             ),
-            if (controller.soloOwner) ...[
-              const SizedBox(width: 8),
+            if (controller.soloOwner)
               OutlinedButton.icon(
                 onPressed: controller.caricamento
                     ? null
                     : () => _importaInsegnamenti(context),
-                icon: const Icon(
-                  Icons.upload_file_outlined,
-                ),
-                label: const Text(
-                  'Importa insegnamenti',
-                ),
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('Importa insegnamenti'),
               ),
-            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -113,7 +121,9 @@ class _InsegnamentiBackofficePageState
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             SizedBox(
-              width: 360,
+              width: MediaQuery.sizeOf(context).width < 760
+                  ? double.infinity
+                  : 360,
               child: TextField(
                 controller: _filtro,
                 decoration: const InputDecoration(
@@ -124,7 +134,9 @@ class _InsegnamentiBackofficePageState
               ),
             ),
             SizedBox(
-              width: 360,
+              width: MediaQuery.sizeOf(context).width < 760
+                  ? double.infinity
+                  : 360,
               child: DropdownButtonFormField<String?>(
                 initialValue: _docenteId,
                 isExpanded: true,
@@ -281,6 +293,7 @@ class _InsegnamentiBackofficePageState
     final team = controller.assegnazioni
         .where((a) => a['mentoraggio_id']?.toString() == id)
         .toList(growable: false);
+    final questionario = questionariController.questionarioMentoraggio(id);
 
     return Card(
       margin: const EdgeInsets.only(top: 12),
@@ -289,37 +302,41 @@ class _InsegnamentiBackofficePageState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Anno accademico $anno',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => _modificaMentoraggio(m),
-                  icon: const Icon(Icons.edit_note_outlined),
-                  label: const Text('Modifica mentoraggio'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _gestisciTeam(m),
-                  icon: const Icon(Icons.groups_outlined),
-                  label: const Text('Mentori / senior'),
-                ),
-                if (m['stato']?.toString().trim().toLowerCase() !=
-                    'completato') ...[
-                  const SizedBox(width: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Anno accademico $anno',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
                   OutlinedButton.icon(
-                    onPressed: controller.caricamento
-                        ? null
-                        : () => _eliminaMentoraggio(m),
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Elimina mentoraggio'),
+                    onPressed: () => _modificaMentoraggio(m),
+                    icon: const Icon(Icons.edit_note_outlined),
+                    label: const Text('Modifica mentoraggio'),
                   ),
+                  OutlinedButton.icon(
+                    onPressed: () => _gestisciTeam(m),
+                    icon: const Icon(Icons.groups_outlined),
+                    label: const Text('Mentori / senior'),
+                  ),
+                  if (m['stato']?.toString().trim().toLowerCase() !=
+                      'completato')
+                    OutlinedButton.icon(
+                      onPressed: controller.caricamento
+                          ? null
+                          : () => _eliminaMentoraggio(m),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Elimina mentoraggio'),
+                    ),
                 ],
-              ],
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -339,6 +356,13 @@ class _InsegnamentiBackofficePageState
                   ? 'Mentori / senior: —'
                   : 'Mentori / senior: ${team.map((a) => '${controller.etichettaPersona(a['mentore_id']?.toString())} (${a['tipo'] ?? '—'})').join(', ')}',
             ),
+            if (questionario != null) ...[
+              const SizedBox(height: 10),
+              QuestionarioRisultatiCard(
+                controller: questionariController,
+                questionario: questionario,
+              ),
+            ],
           ],
         ),
       ),
@@ -570,6 +594,21 @@ class _InsegnamentiBackofficePageState
       partecipante: false,
       mostraCampiSolaLettura: true,
       titolo: 'Mentoraggio ${iniziali['anno_accademico'] ?? ''}',
+      contenutoExtra: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          QuestionarioMentoraggioCard(
+            controller: questionariController,
+            mentoraggioId: iniziali['id'].toString(),
+            consentiRigenerazione: true,
+          ),
+          const SizedBox(height: 12),
+          SchedaSintesiFileCard(
+            mentoraggio: iniziali,
+            onAggiornato: controller.carica,
+          ),
+        ],
+      ),
     );
     if (valori == null) return;
     final id = iniziali['id']?.toString();

@@ -10,6 +10,10 @@ import 'template_elenco_dettaglio_page.dart';
 
 typedef TestoRecordDinamico = String Function(Map<String, dynamic> record);
 typedef WidgetRecordDinamico = Widget? Function(Map<String, dynamic> record);
+typedef DopoSalvataggioRecordDinamico = Future<void> Function(
+  Map<String, dynamic> salvato,
+  Map<String, dynamic>? esistente,
+);
 
 /// Pagina CRUD standard elenco + dettaglio.
 ///
@@ -44,6 +48,7 @@ class PaginaElencoDettaglioCrudDinamica extends StatefulWidget {
     this.messaggioSalvato = 'Dato salvato.',
     this.messaggioEliminato = 'Dato eliminato.',
     this.larghezzaElenco = 360,
+    this.dopoSalvataggio,
   });
 
   final String titolo;
@@ -66,6 +71,7 @@ class PaginaElencoDettaglioCrudDinamica extends StatefulWidget {
   final String messaggioSalvato;
   final String messaggioEliminato;
   final double larghezzaElenco;
+  final DopoSalvataggioRecordDinamico? dopoSalvataggio;
 
   @override
   State<PaginaElencoDettaglioCrudDinamica> createState() =>
@@ -192,10 +198,26 @@ class _PaginaElencoDettaglioCrudDinamicaState
     );
     if (valori == null) return;
     try {
-      await _controller.salva(esistente: esistente, valori: valori);
+      final salvato = await _controller.salva(
+        esistente: esistente,
+        valori: valori,
+      );
+
+      String? avviso;
+      final dopoSalvataggio = widget.dopoSalvataggio;
+      if (dopoSalvataggio != null) {
+        try {
+          await dopoSalvataggio(salvato, esistente);
+        } catch (e) {
+          avviso = ' Notifica automatica non inviata: $e';
+        }
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(widget.messaggioSalvato)),
+        SnackBar(
+          content: Text('${widget.messaggioSalvato}${avviso ?? ''}'),
+        ),
       );
     } on AppException catch (errore) {
       if (!mounted) return;

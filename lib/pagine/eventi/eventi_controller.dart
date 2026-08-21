@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app_exception.dart';
 import '../../sessione_controller.dart';
+import '../../notifiche_automatiche_service.dart';
 import '../../supabase_config.dart';
 
 class EventiController extends ChangeNotifier {
@@ -340,6 +341,27 @@ class EventiController extends ChangeNotifier {
           .eq('evento_id', eventoId)
           .eq('partecipante_id', partecipanteId);
 
+      if (presente && haQuestionario(eventoId)) {
+        final evento = eventi.cast<Map<String, dynamic>?>().firstWhere(
+              (riga) => riga?['id']?.toString() == eventoId,
+              orElse: () => null,
+            );
+        final titoloEvento =
+            evento?['titolo']?.toString().trim() ?? 'evento';
+
+        try {
+          await NotificheAutomaticheService.inviaUtenti(
+            userIds: <String>[partecipanteId],
+            titolo: 'Questionario di gradimento disponibile',
+            messaggio:
+                'La tua presenza a "$titoloEvento" è stata confermata. '
+                'Puoi ora compilare il questionario di gradimento.',
+          );
+        } catch (e) {
+          debugPrint('Notifica questionario evento non inviata: $e');
+        }
+      }
+
       await carica();
       return null;
     } catch (e) {
@@ -513,6 +535,19 @@ class EventiController extends ChangeNotifier {
                 })
                 .eq('id', questionarioId);
           }
+        }
+      }
+
+      if (id == null) {
+        try {
+          await NotificheAutomaticheService.inviaAnnoAccademico(
+            annoAccademico: anno,
+            titolo: 'Nuovo evento',
+            messaggio: 'È stato pubblicato l’evento "$titolo". '
+                'Apri la pagina Eventi per consultare i dettagli e iscriverti.',
+          );
+        } catch (e) {
+          debugPrint('Notifica nuovo evento non inviata: $e');
         }
       }
 

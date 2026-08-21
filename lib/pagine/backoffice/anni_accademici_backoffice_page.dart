@@ -54,6 +54,7 @@ class _AnniAccademiciBackofficePageState
         db.from('house_of_mentore').select(),
         db.from('partecipazioni_house_of_mentore').select(),
         db.from('partecipazioni_annuali').select(),
+        db.from('user_roles').select('user_id, role'),
       ]);
       final insegnamenti = _mappe(risultati[0]);
       final mentoraggi = _mappe(risultati[1]);
@@ -63,6 +64,7 @@ class _AnniAccademiciBackofficePageState
       final hom = _mappe(risultati[5]);
       final partecipazioniHom = _mappe(risultati[6]);
       final partecipazioniAnnuali = _mappe(risultati[7]);
+      final userRoles = _mappe(risultati[8]);
 
       final risultato = <String, _RiepilogoAnno>{};
       for (final anno in widget.controller.anni) {
@@ -78,6 +80,7 @@ class _AnniAccademiciBackofficePageState
           hom: hom,
           partecipazioniHom: partecipazioniHom,
           partecipazioniAnnuali: partecipazioniAnnuali,
+          userRoles: userRoles,
         );
       }
       if (!mounted) return;
@@ -265,6 +268,7 @@ class _AnniAccademiciBackofficePageState
     required List<Map<String, dynamic>> hom,
     required List<Map<String, dynamic>> partecipazioniHom,
     required List<Map<String, dynamic>> partecipazioniAnnuali,
+    required List<Map<String, dynamic>> userRoles,
   }) {
     final mentAnno = mentoraggi
         .where((r) => r['anno_accademico']?.toString() == anno)
@@ -321,9 +325,29 @@ class _AnniAccademiciBackofficePageState
         .where((r) => r['stato']?.toString() == 'rinuncia')
         .length;
 
+    final amministratoriIds = userRoles
+        .where(
+          (r) => <String>{'owner', 'organizer'}
+              .contains(r['role']?.toString()),
+        )
+        .map((r) => r['user_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty && id != 'null')
+        .toSet();
+
+    final partecipantiAnnualiIds = annualiAnno
+        .map((r) => r['user_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty && id != 'null')
+        .toSet();
+
+    final numeroPartecipanti = annualiAnno.isEmpty
+        ? (<String>{...partecipanti, ...amministratoriIds}).length
+        : (<String>{...partecipantiAnnualiIds, ...amministratoriIds}).length;
+
     return _RiepilogoAnno(
       anno: anno,
-      partecipanti: annualiAnno.isEmpty ? partecipanti.length : annualiAnno.length,
+      partecipanti: numeroPartecipanti,
       daConfermare: daConfermare,
       confermati: confermati,
       rinunce: rinunce,

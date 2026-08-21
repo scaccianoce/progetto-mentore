@@ -4,6 +4,7 @@ import '../../app_exception.dart';
 import '../../dinamico/maschera_dinamica_controller.dart';
 import '../../dinamico/repository_dinamico.dart';
 import '../../sessione_controller.dart';
+import '../../notifiche_automatiche_service.dart';
 import '../template/pagina_elenco_dettaglio_crud_dinamica.dart';
 
 /// NEWS - esempio di pagina CRUD standard.
@@ -70,6 +71,21 @@ class NewsPage extends StatelessWidget {
       messaggioSalvato: 'News salvata.',
       messaggioEliminato: 'News eliminata.',
       larghezzaElenco: 340,
+      dopoSalvataggio: (salvato, esistente) async {
+        // La notifica automatica viene inviata soltanto alla prima
+        // pubblicazione della news. Le modifiche successive non generano
+        // notifiche duplicate.
+        if (esistente != null || salvato['attiva'] != true) return;
+
+        final anno = salvato['anno_accademico']?.toString().trim() ?? '';
+        if (anno.isEmpty) return;
+
+        await NotificheAutomaticheService.inviaAnnoAccademico(
+          annoAccademico: anno,
+          titolo: 'Nuova news',
+          messaggio: salvato['titolo']?.toString() ?? 'È disponibile una nuova news.',
+        );
+      },
     );
   }
 }
