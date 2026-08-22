@@ -1017,7 +1017,14 @@ class _NotificheRegoleBackofficePageState
                         subtitle: Text(_descrizioneRegola(r)),
                         trailing: Wrap(
                           spacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: <Widget>[
+                            Switch.adaptive(
+                              value: r['attiva'] == true,
+                              onChanged: _caricamento
+                                  ? null
+                                  : (valore) => _impostaAttiva(r, valore),
+                            ),
                             IconButton(
                               tooltip: 'Modifica',
                               onPressed: () => _modifica(r),
@@ -1055,6 +1062,46 @@ class _NotificheRegoleBackofficePageState
     }
     parti.add('→ ${r['destinatari'] ?? ''}');
     return parti.where((v) => v.isNotEmpty).join(' · ');
+  }
+
+  Future<void> _impostaAttiva(
+    Map<String, dynamic> regola,
+    bool valore,
+  ) async {
+    final id = regola['id']?.toString();
+    if (id == null || id.isEmpty) return;
+
+    final precedente = regola['attiva'] == true;
+
+    setState(() {
+      regola['attiva'] = valore;
+    });
+
+    try {
+      await SupabaseConfig.client
+          .from('notifiche_regole')
+          .update({'attiva': valore})
+          .eq('id', id);
+
+      // Il trigger notifiche_regole_config_changed aggiorna automaticamente
+      // la configurazione dei trigger sorgente nel database.
+      await _carica();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        regola['attiva'] = precedente;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Impossibile ${valore ? 'attivare' : 'disattivare'} '
+            'la regola: $e',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _modifica([Map<String, dynamic>? regola]) async {
