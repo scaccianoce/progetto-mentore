@@ -1,0 +1,98 @@
+schema_name,table_name,constraint_name,constraint_type,definition
+public,abilitazioni_modifica,abilitazione_coerente,CHECK,CHECK (abilitata = false OR abilitata_da IS NOT NULL AND abilitata_at IS NOT NULL)
+public,abilitazioni_modifica,abilitazioni_modifica_abilitata_da_fkey,FOREIGN KEY,FOREIGN KEY (abilitata_da) REFERENCES auth.users(id) ON DELETE SET NULL
+public,abilitazioni_modifica,abilitazioni_modifica_anno_accademico_fkey,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,abilitazioni_modifica,abilitazioni_modifica_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES anagrafica(user_id) ON DELETE CASCADE
+public,abilitazioni_modifica,abilitazioni_modifica_pkey,PRIMARY KEY,"PRIMARY KEY (user_id, ambito, anno_accademico)"
+public,anagrafica,anagrafica_email_valida,CHECK,"CHECK (email_unipa::text ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'::text)"
+public,anagrafica,anagrafica_url_valido,CHECK,CHECK (pagina_personale_unipa IS NULL OR pagina_personale_unipa::text ~* '^https?://'::text)
+public,anagrafica,anagrafica_anno_prima_partecipazione_fkey,FOREIGN KEY,FOREIGN KEY (anno_prima_partecipazione) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,anagrafica,anagrafica_cod_ssd_fkey,FOREIGN KEY,FOREIGN KEY (cod_ssd) REFERENCES ssd(cod_ssd) ON UPDATE CASCADE ON DELETE RESTRICT
+public,anagrafica,anagrafica_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+public,anagrafica,anagrafica_pkey,PRIMARY KEY,PRIMARY KEY (user_id)
+public,anagrafica_riservata,anagrafica_riservata_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES anagrafica(user_id) ON DELETE CASCADE
+public,anagrafica_riservata,anagrafica_riservata_pkey,PRIMARY KEY,PRIMARY KEY (user_id)
+public,anni_accademici,anni_accademici_stato_check,CHECK,"CHECK (stato = ANY (ARRAY['preparazione'::text, 'attivo'::text, 'chiuso'::text]))"
+public,anni_accademici,date_anno_accademico_valide,CHECK,CHECK (data_inizio IS NULL OR data_fine IS NULL OR data_fine >= data_inizio)
+public,anni_accademici,formato_anno_accademico,CHECK,CHECK (codice::text ~ '^[0-9]{4}-[0-9]{2}$'::text)
+public,anni_accademici,anni_accademici_pkey,PRIMARY KEY,PRIMARY KEY (codice)
+public,eventi,date_iscrizioni_evento_valide,CHECK,CHECK (data_apertura_iscrizioni IS NULL OR data_chiusura_iscrizioni IS NULL OR data_chiusura_iscrizioni >= data_apertura_iscrizioni)
+public,eventi,eventi_attivo_check,CHECK,"CHECK (attiva = ANY (ARRAY[true, false]))"
+public,eventi,eventi_locandina_url_check,CHECK,CHECK (locandina_url IS NULL OR locandina_url ~* '^https?://'::text)
+public,eventi,eventi_anno_accademico_fkey,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,eventi,eventi_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,house_of_mentore,house_of_mentore_titolo_check,CHECK,CHECK (length(TRIM(BOTH FROM titolo)) > 0)
+public,house_of_mentore,house_of_mentore_anno_accademico_fkey,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,house_of_mentore,house_of_mentore_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_descrizione_check,CHECK,CHECK (length(TRIM(BOTH FROM descrizione)) > 0)
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_evento_id_fkey,FOREIGN KEY,FOREIGN KEY (evento_id) REFERENCES house_of_mentore(id) ON UPDATE CASCADE ON DELETE CASCADE
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_id_evento_unique,UNIQUE,"UNIQUE (id, evento_id)"
+public,import_insegnamenti,import_insegnamenti_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,import_partecipanti,import_partecipanti_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,insegnamenti,cfu_positivo,CHECK,CHECK (cfu > 0::numeric)
+public,insegnamenti,ore_positive,CHECK,CHECK (ore >= 0)
+public,insegnamenti,insegnamenti_docente_id_fkey,FOREIGN KEY,FOREIGN KEY (docente_id) REFERENCES anagrafica(user_id) ON UPDATE CASCADE ON DELETE RESTRICT
+public,insegnamenti,insegnamenti_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,mentoraggi,link_questionario_valido,CHECK,CHECK (link_questionario IS NULL OR link_questionario::text ~* '^https?://'::text)
+public,mentoraggi,mentoraggi_anno_accademico_fk,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,mentoraggi,mentoraggi_insegnamento_id_fkey,FOREIGN KEY,FOREIGN KEY (insegnamento_id) REFERENCES insegnamenti(id) ON DELETE CASCADE
+public,mentoraggi,mentoraggi_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,mentoraggio_mentori,mentoraggio_mentori_mentoraggio_id_fkey,FOREIGN KEY,FOREIGN KEY (mentoraggio_id) REFERENCES mentoraggi(id) ON DELETE CASCADE
+public,mentoraggio_mentori,mentoraggio_mentori_mentore_id_fkey,FOREIGN KEY,FOREIGN KEY (mentore_id) REFERENCES anagrafica(user_id) ON DELETE RESTRICT
+public,mentoraggio_mentori,mentoraggio_mentori_pkey,PRIMARY KEY,"PRIMARY KEY (mentoraggio_id, mentore_id, tipo)"
+public,news,news_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,notifiche_destinatari,notifiche_destinatari_messaggio_fk,FOREIGN KEY,FOREIGN KEY (messaggio_id) REFERENCES notifiche_messaggi(id) ON DELETE CASCADE
+public,notifiche_destinatari,notifiche_destinatari_user_fk,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+public,notifiche_destinatari,notifiche_destinatari_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,notifiche_destinatari,notifiche_destinatari_unique,UNIQUE,"UNIQUE (messaggio_id, user_id)"
+public,notifiche_dispositivi,notifiche_dispositivi_user_fk,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+public,notifiche_dispositivi,notifiche_dispositivi_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,notifiche_dispositivi,notifiche_dispositivi_token_unique,UNIQUE,UNIQUE (token)
+public,notifiche_messaggi,notifiche_messaggi_anno_fk,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE RESTRICT
+public,notifiche_messaggi,notifiche_messaggi_creata_da_fk,FOREIGN KEY,FOREIGN KEY (creata_da) REFERENCES auth.users(id) ON DELETE SET NULL
+public,notifiche_messaggi,notifiche_messaggi_regola_fk,FOREIGN KEY,FOREIGN KEY (regola_id) REFERENCES notifiche_regole(id) ON DELETE SET NULL
+public,notifiche_messaggi,notifiche_messaggi_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,notifiche_regole,notifiche_regole_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,notifiche_regole,notifiche_regole_codice_key,UNIQUE,UNIQUE (codice)
+public,partecipazioni_annuali,partecipazioni_annuali_stato_check,CHECK,"CHECK (stato = ANY (ARRAY['da_contattare'::text, 'confermato'::text, 'rinuncia'::text, 'nuovo'::text, 'sospeso'::text]))"
+public,partecipazioni_annuali,partecipazioni_annuali_anno_accademico_fkey,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON DELETE RESTRICT
+public,partecipazioni_annuali,partecipazioni_annuali_confermato_da_fkey,FOREIGN KEY,FOREIGN KEY (confermato_da) REFERENCES auth.users(id) ON DELETE SET NULL
+public,partecipazioni_annuali,partecipazioni_annuali_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES anagrafica(user_id) ON DELETE CASCADE
+public,partecipazioni_annuali,partecipazioni_annuali_pkey,PRIMARY KEY,"PRIMARY KEY (user_id, anno_accademico)"
+public,partecipazioni_eventi,partecipazioni_eventi_evento_id_fkey,FOREIGN KEY,FOREIGN KEY (evento_id) REFERENCES eventi(id) ON DELETE CASCADE
+public,partecipazioni_eventi,partecipazioni_eventi_partecipante_id_fkey,FOREIGN KEY,FOREIGN KEY (partecipante_id) REFERENCES anagrafica(user_id) ON DELETE RESTRICT
+public,partecipazioni_eventi,partecipazioni_eventi_presente_impostato_da_fkey,FOREIGN KEY,FOREIGN KEY (presente_impostato_da) REFERENCES auth.users(id) ON DELETE SET NULL
+public,partecipazioni_eventi,partecipazioni_eventi_pkey,PRIMARY KEY,"PRIMARY KEY (evento_id, partecipante_id)"
+public,partecipazioni_house_of_mentore,partecipazioni_house_of_mentore_evento_id_fkey,FOREIGN KEY,FOREIGN KEY (evento_id) REFERENCES house_of_mentore(id) ON UPDATE CASCADE ON DELETE CASCADE
+public,partecipazioni_house_of_mentore,partecipazioni_house_of_mentore_partecipante_id_fkey,FOREIGN KEY,FOREIGN KEY (partecipante_id) REFERENCES anagrafica(user_id) ON UPDATE CASCADE ON DELETE RESTRICT
+public,partecipazioni_house_of_mentore,partecipazioni_house_opzione_evento_fk,FOREIGN KEY,"FOREIGN KEY (opzione_id, evento_id) REFERENCES house_of_mentore_opzioni(id, evento_id) ON UPDATE CASCADE ON DELETE RESTRICT"
+public,partecipazioni_house_of_mentore,partecipazioni_house_of_mentore_pkey,PRIMARY KEY,"PRIMARY KEY (evento_id, partecipante_id)"
+public,questionari,questionari_riferimento_check,CHECK,CHECK (provider = 'interno'::questionario_provider AND evento_id IS NOT NULL AND mentoraggio_id IS NULL OR provider = 'pubblico'::questionario_provider AND mentoraggio_id IS NOT NULL AND evento_id IS NULL)
+public,questionari,questionari_url_esterno_check,CHECK,CHECK (url_esterno IS NULL OR url_esterno ~* '^https?://'::text)
+public,questionari,questionari_created_by_fkey,FOREIGN KEY,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+public,questionari,questionari_evento_id_fkey,FOREIGN KEY,FOREIGN KEY (evento_id) REFERENCES eventi(id) ON UPDATE CASCADE ON DELETE CASCADE
+public,questionari,questionari_mentoraggio_id_fkey,FOREIGN KEY,FOREIGN KEY (mentoraggio_id) REFERENCES mentoraggi(id) ON UPDATE CASCADE ON DELETE CASCADE
+public,questionari,questionari_template_id_fkey,FOREIGN KEY,FOREIGN KEY (template_id) REFERENCES questionari_template(id) ON DELETE RESTRICT
+public,questionari,questionari_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,questionari_compilazioni,questionari_compilazioni_questionario_id_fkey,FOREIGN KEY,FOREIGN KEY (questionario_id) REFERENCES questionari(id) ON DELETE CASCADE
+public,questionari_compilazioni,questionari_compilazioni_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+public,questionari_compilazioni,questionari_compilazioni_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,questionari_compilazioni,questionari_compilazioni_questionario_id_user_id_key,UNIQUE,"UNIQUE (questionario_id, user_id)"
+public,questionari_domande,questionari_domande_template_id_fkey,FOREIGN KEY,FOREIGN KEY (template_id) REFERENCES questionari_template(id) ON DELETE CASCADE
+public,questionari_domande,questionari_domande_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,questionari_domande,questionari_domande_template_id_ordine_key,UNIQUE,"UNIQUE (template_id, ordine)"
+public,questionari_risposte,questionari_risposte_compilazione_id_fkey,FOREIGN KEY,FOREIGN KEY (compilazione_id) REFERENCES questionari_compilazioni(id) ON DELETE CASCADE
+public,questionari_risposte,questionari_risposte_domanda_id_fkey,FOREIGN KEY,FOREIGN KEY (domanda_id) REFERENCES questionari_domande(id) ON DELETE CASCADE
+public,questionari_risposte,questionari_risposte_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,questionari_risposte,questionari_risposte_compilazione_id_domanda_id_key,UNIQUE,"UNIQUE (compilazione_id, domanda_id)"
+public,questionari_template,questionari_template_created_by_fkey,FOREIGN KEY,FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+public,questionari_template,questionari_template_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,risorse_mentoring,risorse_mentoring_categoria_check,CHECK,"CHECK (categoria::text = ANY (ARRAY['Materiale di presentazione'::character varying, 'Materiale per l''attività di mentoraggio'::character varying, 'Materiale burocratico/amministrativo'::character varying, 'Altro'::character varying]::text[]))"
+public,risorse_mentoring,risorse_mentoring_anno_accademico_fkey,FOREIGN KEY,FOREIGN KEY (anno_accademico) REFERENCES anni_accademici(codice) ON UPDATE CASCADE ON DELETE SET NULL
+public,risorse_mentoring,risorse_mentoring_uploaded_by_fkey,FOREIGN KEY,FOREIGN KEY (uploaded_by) REFERENCES auth.users(id) ON DELETE SET NULL
+public,risorse_mentoring,risorse_mentoring_pkey,PRIMARY KEY,PRIMARY KEY (id)
+public,risorse_mentoring,risorse_mentoring_storage_path_key,UNIQUE,UNIQUE (storage_path)
+public,ssd,ssd_pkey,PRIMARY KEY,PRIMARY KEY (cod_ssd)
+public,user_roles,user_roles_user_id_fkey,FOREIGN KEY,FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+public,user_roles,user_roles_pkey,PRIMARY KEY,PRIMARY KEY (user_id)

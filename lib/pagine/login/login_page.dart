@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
-import '../../app_branding.dart';
-import '../../sessione_controller.dart';
+import '../../app/app_core.dart';
+import '../../app/app_session_controller.dart';
 import 'login_controller.dart';
 
+/// Pagina di autenticazione.
+///
+/// Contiene esclusivamente layout, validazione dei campi e componenti grafici.
+/// Il processo di login e' delegato a [LoginController].
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.sessione});
+  const LoginPage({
+    super.key,
+    required this.sessione,
+  });
 
   final SessioneController sessione;
 
@@ -15,6 +22,9 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
   late final LoginController _controller;
 
   @override
@@ -26,6 +36,8 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void dispose() {
     _controller.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -39,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
             constraints: const BoxConstraints(maxWidth: 430),
             child: AnimatedBuilder(
               animation: _controller,
-              builder: (BuildContext context, Widget? child) {
+              builder: (context, _) {
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(28),
@@ -62,24 +74,21 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 28),
                           TextFormField(
-                            controller: _controller.emailController,
+                            controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
-                            autofillHints: const <String>[AutofillHints.email],
+                            autofillHints: const <String>[
+                              AutofillHints.email,
+                            ],
                             decoration: const InputDecoration(
                               labelText: 'Email',
                               prefixIcon: Icon(Icons.email_outlined),
                               border: OutlineInputBorder(),
                             ),
-                            validator: (String? valore) {
-                              final String email = valore?.trim() ?? '';
-                              return email.contains('@')
-                                  ? null
-                                  : 'Inserisci un’email valida.';
-                            },
+                            validator: _validaEmail,
                           ),
                           const SizedBox(height: 16),
                           TextFormField(
-                            controller: _controller.passwordController,
+                            controller: _passwordController,
                             obscureText: !_controller.passwordVisibile,
                             autofillHints: const <String>[
                               AutofillHints.password,
@@ -93,7 +102,8 @@ class _LoginPageState extends State<LoginPage> {
                                 tooltip: _controller.passwordVisibile
                                     ? 'Nascondi password'
                                     : 'Mostra password',
-                                onPressed: _controller.cambiaVisibilitaPassword,
+                                onPressed:
+                                    _controller.cambiaVisibilitaPassword,
                                 icon: Icon(
                                   _controller.passwordVisibile
                                       ? Icons.visibility_off_outlined
@@ -101,25 +111,23 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               ),
                             ),
-                            validator: (String? valore) {
-                              return valore == null || valore.isEmpty
-                                  ? 'Inserisci la password.'
-                                  : null;
-                            },
+                            validator: _validaPassword,
                           ),
                           if (_controller.errore case final String errore) ...[
                             const SizedBox(height: 12),
                             Text(
                               errore,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
                               textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color:
+                                    Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ],
                           const SizedBox(height: 22),
                           FilledButton(
-                            onPressed: _controller.caricamento ? null : _accedi,
+                            onPressed:
+                                _controller.caricamento ? null : _accedi,
                             child: _controller.caricamento
                                 ? const SizedBox.square(
                                     dimension: 20,
@@ -142,9 +150,27 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Future<void> _accedi() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      await _controller.accedi();
+  String? _validaEmail(String? valore) {
+    final email = valore?.trim() ?? '';
+    if (email.isEmpty || !email.contains('@')) {
+      return 'Inserisci un’email valida.';
     }
+    return null;
+  }
+
+  String? _validaPassword(String? valore) {
+    if (valore == null || valore.isEmpty) {
+      return 'Inserisci la password.';
+    }
+    return null;
+  }
+
+  Future<void> _accedi() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    await _controller.accedi(
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
   }
 }

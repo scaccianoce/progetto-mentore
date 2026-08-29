@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../notifiche_push_service.dart';
+import '../../supporto/notifiche_push_service.dart';
+import '../../supporto/utilita.dart';
 
 import 'notifiche_controller.dart';
 
+/// Pagina personale delle notifiche ricevute dall'utente autenticato.
 class NotifichePage extends StatefulWidget {
   const NotifichePage({super.key});
 
@@ -12,38 +14,38 @@ class NotifichePage extends StatefulWidget {
   State<NotifichePage> createState() => _NotifichePageState();
 }
 
+/// Stato interno della pagina; coordina rendering e interazioni della UI.
 class _NotifichePageState extends State<NotifichePage> {
   late final NotificheController _controller;
 
+  /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
   void initState() {
     super.initState();
-    _controller = NotificheController()..addListener(_aggiorna);
+    _controller = NotificheController()..carica();
     NotifichePushService.instance.aggiornamenti.addListener(_pushRicevuta);
-    _controller.carica();
   }
 
+  /// Rilascia listener e controller associati allo stato della pagina.
   @override
   void dispose() {
     NotifichePushService.instance.aggiornamenti.removeListener(_pushRicevuta);
-    _controller
-      ..removeListener(_aggiorna)
-      ..dispose();
+    _controller.dispose();
     super.dispose();
   }
 
-  void _aggiorna() {
-    if (mounted) setState(() {});
-  }
-
+  /// Gestisce l’operazione interna “push ricevuta” della pagina.
   void _pushRicevuta() {
     _controller.carica();
   }
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Scaffold(
+        body: SafeArea(
         minimum: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -126,10 +128,12 @@ class _NotifichePageState extends State<NotifichePage> {
             ),
           ],
         ),
+        ),
       ),
     );
   }
 
+  /// Gestisce l’operazione interna “apri” della pagina.
   Future<void> _apri(NotificaRicevuta notifica) async {
     final errore = await _controller.segnaComeLetta(notifica);
     if (!mounted) return;
@@ -164,6 +168,7 @@ class _NotifichePageState extends State<NotifichePage> {
     );
   }
 
+  /// Determina l’operazione `percorsoOrigine` mantenendo separata la logica dalla UI.
   String? _percorsoOrigine(NotificaRicevuta notifica) {
     return switch (notifica.origineTabella) {
       'news' => '/news',
@@ -175,13 +180,10 @@ class _NotifichePageState extends State<NotifichePage> {
     };
   }
 
+  /// Gestisce l’operazione interna “sottotitolo” della pagina.
   String _sottotitolo(NotificaRicevuta notifica) {
     final data = notifica.inviataAt ?? notifica.createdAt;
-    final giorno = data.day.toString().padLeft(2, '0');
-    final mese = data.month.toString().padLeft(2, '0');
-    final ora = data.hour.toString().padLeft(2, '0');
-    final minuti = data.minute.toString().padLeft(2, '0');
     final anno = notifica.annoAccademico;
-    return '$giorno/$mese/$data.year $ora:$minuti${anno == null ? '' : ' · $anno'}';
+    return '${formattaDataOra(data)}${anno == null ? '' : ' · $anno'}';
   }
 }

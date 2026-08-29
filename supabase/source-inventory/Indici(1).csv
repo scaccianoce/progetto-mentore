@@ -1,0 +1,83 @@
+schemaname,tablename,indexname,indexdef
+public,abilitazioni_modifica,abilitazioni_modifica_pkey,"CREATE UNIQUE INDEX abilitazioni_modifica_pkey ON public.abilitazioni_modifica USING btree (user_id, ambito, anno_accademico)"
+public,anagrafica,anagrafica_email_unipa_unique,CREATE UNIQUE INDEX anagrafica_email_unipa_unique ON public.anagrafica USING btree (lower((email_unipa)::text))
+public,anagrafica,anagrafica_email_unipa_unique_ci,CREATE UNIQUE INDEX anagrafica_email_unipa_unique_ci ON public.anagrafica USING btree (lower(TRIM(BOTH FROM email_unipa))) WHERE ((email_unipa IS NOT NULL) AND (TRIM(BOTH FROM email_unipa) <> ''::text))
+public,anagrafica,anagrafica_pkey,CREATE UNIQUE INDEX anagrafica_pkey ON public.anagrafica USING btree (user_id)
+public,anagrafica_riservata,anagrafica_riservata_attivo_idx,CREATE INDEX anagrafica_riservata_attivo_idx ON public.anagrafica_riservata USING btree (attivo)
+public,anagrafica_riservata,anagrafica_riservata_notifiche_attivo_idx,"CREATE INDEX anagrafica_riservata_notifiche_attivo_idx ON public.anagrafica_riservata USING btree (user_id, attivo)"
+public,anagrafica_riservata,anagrafica_riservata_pkey,CREATE UNIQUE INDEX anagrafica_riservata_pkey ON public.anagrafica_riservata USING btree (user_id)
+public,anagrafica_riservata,anagrafica_riservata_user_attivo_idx,"CREATE INDEX anagrafica_riservata_user_attivo_idx ON public.anagrafica_riservata USING btree (user_id, attivo)"
+public,anni_accademici,anni_accademici_pkey,CREATE UNIQUE INDEX anni_accademici_pkey ON public.anni_accademici USING btree (codice)
+public,anni_accademici,anni_accademici_unica_preparazione,CREATE UNIQUE INDEX anni_accademici_unica_preparazione ON public.anni_accademici USING btree (stato) WHERE (stato = 'preparazione'::text)
+public,anni_accademici,anni_accademici_unico_attivo,CREATE UNIQUE INDEX anni_accademici_unico_attivo ON public.anni_accademici USING btree (stato) WHERE (stato = 'attivo'::text)
+public,anni_accademici,un_solo_anno_accademico_corrente,CREATE UNIQUE INDEX un_solo_anno_accademico_corrente ON public.anni_accademici USING btree (corrente) WHERE (corrente = true)
+public,eventi,eventi_pkey,CREATE UNIQUE INDEX eventi_pkey ON public.eventi USING btree (id)
+public,house_of_mentore,house_of_mentore_anno_idx,CREATE INDEX house_of_mentore_anno_idx ON public.house_of_mentore USING btree (anno_accademico)
+public,house_of_mentore,house_of_mentore_data_idx,CREATE INDEX house_of_mentore_data_idx ON public.house_of_mentore USING btree (data_evento)
+public,house_of_mentore,house_of_mentore_pkey,CREATE UNIQUE INDEX house_of_mentore_pkey ON public.house_of_mentore USING btree (id)
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_id_evento_unique,"CREATE UNIQUE INDEX house_of_mentore_opzioni_id_evento_unique ON public.house_of_mentore_opzioni USING btree (id, evento_id)"
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_ordine_idx,"CREATE INDEX house_of_mentore_opzioni_ordine_idx ON public.house_of_mentore_opzioni USING btree (evento_id, ordine_visualizzazione)"
+public,house_of_mentore_opzioni,house_of_mentore_opzioni_pkey,CREATE UNIQUE INDEX house_of_mentore_opzioni_pkey ON public.house_of_mentore_opzioni USING btree (id)
+public,import_insegnamenti,import_insegnamenti_pkey,CREATE UNIQUE INDEX import_insegnamenti_pkey ON public.import_insegnamenti USING btree (id)
+public,import_partecipanti,import_partecipanti_pkey,CREATE UNIQUE INDEX import_partecipanti_pkey ON public.import_partecipanti USING btree (id)
+public,insegnamenti,insegnamenti_docente_idx,CREATE INDEX insegnamenti_docente_idx ON public.insegnamenti USING btree (docente_id)
+public,insegnamenti,insegnamenti_pkey,CREATE UNIQUE INDEX insegnamenti_pkey ON public.insegnamenti USING btree (id)
+public,mentoraggi,mentoraggi_anno_accademico_idx,CREATE INDEX mentoraggi_anno_accademico_idx ON public.mentoraggi USING btree (anno_accademico)
+public,mentoraggi,mentoraggi_anno_idx,CREATE INDEX mentoraggi_anno_idx ON public.mentoraggi USING btree (anno_accademico)
+public,mentoraggi,mentoraggi_insegnamento_anno_unique,"CREATE UNIQUE INDEX mentoraggi_insegnamento_anno_unique ON public.mentoraggi USING btree (insegnamento_id, anno_accademico) WHERE (anno_accademico IS NOT NULL)"
+public,mentoraggi,mentoraggi_insegnamento_idx,CREATE INDEX mentoraggi_insegnamento_idx ON public.mentoraggi USING btree (insegnamento_id)
+public,mentoraggi,mentoraggi_pkey,CREATE UNIQUE INDEX mentoraggi_pkey ON public.mentoraggi USING btree (id)
+public,mentoraggio_mentori,mentoraggio_mentori_mentoraggio_idx,CREATE INDEX mentoraggio_mentori_mentoraggio_idx ON public.mentoraggio_mentori USING btree (mentoraggio_id)
+public,mentoraggio_mentori,mentoraggio_mentori_mentore_idx,CREATE INDEX mentoraggio_mentori_mentore_idx ON public.mentoraggio_mentori USING btree (mentore_id)
+public,mentoraggio_mentori,mentoraggio_mentori_pkey,"CREATE UNIQUE INDEX mentoraggio_mentori_pkey ON public.mentoraggio_mentori USING btree (mentoraggio_id, mentore_id, tipo)"
+public,mentoraggio_mentori,mentoraggio_mentori_univoco,"CREATE UNIQUE INDEX mentoraggio_mentori_univoco ON public.mentoraggio_mentori USING btree (mentoraggio_id, mentore_id, tipo)"
+public,mentoraggio_mentori,un_solo_mentore_senior,CREATE UNIQUE INDEX un_solo_mentore_senior ON public.mentoraggio_mentori USING btree (mentoraggio_id) WHERE (tipo = 'senior'::tipo_mentore)
+public,news,news_pkey,CREATE UNIQUE INDEX news_pkey ON public.news USING btree (id)
+public,notifiche_destinatari,notifiche_destinatari_messaggio_idx,CREATE INDEX notifiche_destinatari_messaggio_idx ON public.notifiche_destinatari USING btree (messaggio_id)
+public,notifiche_destinatari,notifiche_destinatari_pkey,CREATE UNIQUE INDEX notifiche_destinatari_pkey ON public.notifiche_destinatari USING btree (id)
+public,notifiche_destinatari,notifiche_destinatari_stato_idx,CREATE INDEX notifiche_destinatari_stato_idx ON public.notifiche_destinatari USING btree (stato)
+public,notifiche_destinatari,notifiche_destinatari_unique,"CREATE UNIQUE INDEX notifiche_destinatari_unique ON public.notifiche_destinatari USING btree (messaggio_id, user_id)"
+public,notifiche_destinatari,notifiche_destinatari_user_idx,CREATE INDEX notifiche_destinatari_user_idx ON public.notifiche_destinatari USING btree (user_id)
+public,notifiche_dispositivi,notifiche_dispositivi_attivo_idx,CREATE INDEX notifiche_dispositivi_attivo_idx ON public.notifiche_dispositivi USING btree (attivo)
+public,notifiche_dispositivi,notifiche_dispositivi_pkey,CREATE UNIQUE INDEX notifiche_dispositivi_pkey ON public.notifiche_dispositivi USING btree (id)
+public,notifiche_dispositivi,notifiche_dispositivi_token_unique,CREATE UNIQUE INDEX notifiche_dispositivi_token_unique ON public.notifiche_dispositivi USING btree (token)
+public,notifiche_dispositivi,notifiche_dispositivi_user_idx,CREATE INDEX notifiche_dispositivi_user_idx ON public.notifiche_dispositivi USING btree (user_id)
+public,notifiche_messaggi,notifiche_messaggi_anno_idx,CREATE INDEX notifiche_messaggi_anno_idx ON public.notifiche_messaggi USING btree (anno_accademico)
+public,notifiche_messaggi,notifiche_messaggi_chiave_univoca_idx,CREATE UNIQUE INDEX notifiche_messaggi_chiave_univoca_idx ON public.notifiche_messaggi USING btree (chiave_univoca) WHERE (chiave_univoca IS NOT NULL)
+public,notifiche_messaggi,notifiche_messaggi_pkey,CREATE UNIQUE INDEX notifiche_messaggi_pkey ON public.notifiche_messaggi USING btree (id)
+public,notifiche_messaggi,notifiche_messaggi_programmata_idx,CREATE INDEX notifiche_messaggi_programmata_idx ON public.notifiche_messaggi USING btree (programmata_per)
+public,notifiche_messaggi,notifiche_messaggi_stato_idx,CREATE INDEX notifiche_messaggi_stato_idx ON public.notifiche_messaggi USING btree (stato)
+public,notifiche_regole,notifiche_regole_attive_idx,"CREATE INDEX notifiche_regole_attive_idx ON public.notifiche_regole USING btree (attiva, tipo_attivazione)"
+public,notifiche_regole,notifiche_regole_codice_key,CREATE UNIQUE INDEX notifiche_regole_codice_key ON public.notifiche_regole USING btree (codice)
+public,notifiche_regole,notifiche_regole_pkey,CREATE UNIQUE INDEX notifiche_regole_pkey ON public.notifiche_regole USING btree (id)
+public,notifiche_regole,notifiche_regole_tabella_idx,CREATE INDEX notifiche_regole_tabella_idx ON public.notifiche_regole USING btree (tabella) WHERE (tabella IS NOT NULL)
+public,partecipazioni_annuali,partecipazioni_annuali_anno_stato_idx,"CREATE INDEX partecipazioni_annuali_anno_stato_idx ON public.partecipazioni_annuali USING btree (anno_accademico, stato)"
+public,partecipazioni_annuali,partecipazioni_annuali_pkey,"CREATE UNIQUE INDEX partecipazioni_annuali_pkey ON public.partecipazioni_annuali USING btree (user_id, anno_accademico)"
+public,partecipazioni_eventi,partecipazioni_eventi_pkey,"CREATE UNIQUE INDEX partecipazioni_eventi_pkey ON public.partecipazioni_eventi USING btree (evento_id, partecipante_id)"
+public,partecipazioni_house_of_mentore,partecipazioni_house_of_mentore_pkey,"CREATE UNIQUE INDEX partecipazioni_house_of_mentore_pkey ON public.partecipazioni_house_of_mentore USING btree (evento_id, partecipante_id)"
+public,partecipazioni_house_of_mentore,partecipazioni_house_opzione_idx,CREATE INDEX partecipazioni_house_opzione_idx ON public.partecipazioni_house_of_mentore USING btree (opzione_id)
+public,partecipazioni_house_of_mentore,partecipazioni_house_partecipante_idx,CREATE INDEX partecipazioni_house_partecipante_idx ON public.partecipazioni_house_of_mentore USING btree (partecipante_id)
+public,questionari,questionari_evento_interno_unique,CREATE UNIQUE INDEX questionari_evento_interno_unique ON public.questionari USING btree (evento_id) WHERE (provider = 'interno'::questionario_provider)
+public,questionari,questionari_mentoraggio_idx,CREATE INDEX questionari_mentoraggio_idx ON public.questionari USING btree (mentoraggio_id)
+public,questionari,questionari_mentoraggio_pubblico_unique,CREATE UNIQUE INDEX questionari_mentoraggio_pubblico_unique ON public.questionari USING btree (mentoraggio_id) WHERE (provider = 'pubblico'::questionario_provider)
+public,questionari,questionari_pkey,CREATE UNIQUE INDEX questionari_pkey ON public.questionari USING btree (id)
+public,questionari,questionari_pubblico_mentoraggio_unique,CREATE UNIQUE INDEX questionari_pubblico_mentoraggio_unique ON public.questionari USING btree (mentoraggio_id) WHERE ((provider = 'pubblico'::questionario_provider) AND (mentoraggio_id IS NOT NULL))
+public,questionari,questionari_pubblico_token_unique,CREATE UNIQUE INDEX questionari_pubblico_token_unique ON public.questionari USING btree (pubblico_token) WHERE (pubblico_token IS NOT NULL)
+public,questionari,questionari_template_idx,CREATE INDEX questionari_template_idx ON public.questionari USING btree (template_id)
+public,questionari,questionari_token_pubblico_unique,CREATE UNIQUE INDEX questionari_token_pubblico_unique ON public.questionari USING btree (token_pubblico) WHERE (token_pubblico IS NOT NULL)
+public,questionari_compilazioni,questionari_compilazione_interna_unique,"CREATE UNIQUE INDEX questionari_compilazione_interna_unique ON public.questionari_compilazioni USING btree (questionario_id, user_id) WHERE (user_id IS NOT NULL)"
+public,questionari_compilazioni,questionari_compilazioni_pkey,CREATE UNIQUE INDEX questionari_compilazioni_pkey ON public.questionari_compilazioni USING btree (id)
+public,questionari_compilazioni,questionari_compilazioni_questionario_id_user_id_key,"CREATE UNIQUE INDEX questionari_compilazioni_questionario_id_user_id_key ON public.questionari_compilazioni USING btree (questionario_id, user_id)"
+public,questionari_compilazioni,questionari_compilazioni_questionario_idx,CREATE INDEX questionari_compilazioni_questionario_idx ON public.questionari_compilazioni USING btree (questionario_id)
+public,questionari_domande,questionari_domande_pkey,CREATE UNIQUE INDEX questionari_domande_pkey ON public.questionari_domande USING btree (id)
+public,questionari_domande,questionari_domande_template_id_ordine_key,"CREATE UNIQUE INDEX questionari_domande_template_id_ordine_key ON public.questionari_domande USING btree (template_id, ordine)"
+public,questionari_domande,questionari_domande_template_idx,"CREATE INDEX questionari_domande_template_idx ON public.questionari_domande USING btree (template_id, ordine)"
+public,questionari_risposte,questionari_risposte_compilazione_id_domanda_id_key,"CREATE UNIQUE INDEX questionari_risposte_compilazione_id_domanda_id_key ON public.questionari_risposte USING btree (compilazione_id, domanda_id)"
+public,questionari_risposte,questionari_risposte_pkey,CREATE UNIQUE INDEX questionari_risposte_pkey ON public.questionari_risposte USING btree (id)
+public,questionari_template,questionari_template_default_unique,CREATE UNIQUE INDEX questionari_template_default_unique ON public.questionari_template USING btree (destinatario) WHERE ((predefinito = true) AND (attivo = true))
+public,questionari_template,questionari_template_destinatario_idx,CREATE INDEX questionari_template_destinatario_idx ON public.questionari_template USING btree (destinatario)
+public,questionari_template,questionari_template_pkey,CREATE UNIQUE INDEX questionari_template_pkey ON public.questionari_template USING btree (id)
+public,risorse_mentoring,risorse_mentoring_pkey,CREATE UNIQUE INDEX risorse_mentoring_pkey ON public.risorse_mentoring USING btree (id)
+public,risorse_mentoring,risorse_mentoring_storage_path_key,CREATE UNIQUE INDEX risorse_mentoring_storage_path_key ON public.risorse_mentoring USING btree (storage_path)
+public,ssd,ssd_pkey,CREATE UNIQUE INDEX ssd_pkey ON public.ssd USING btree (cod_ssd)
+public,user_roles,user_roles_pkey,CREATE UNIQUE INDEX user_roles_pkey ON public.user_roles USING btree (user_id)

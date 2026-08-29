@@ -1,0 +1,60 @@
+jobid,schedule,command,nodename,nodeport,database,username,active,jobname
+1,* * * * *,"
+
+  select net.http_post(
+
+    -- ---------------------------------------------------------------
+    -- URL EDGE FUNCTION
+    -- ---------------------------------------------------------------
+
+    url := (
+      select decrypted_secret
+      from vault.decrypted_secrets
+      where name = 'notifiche_project_url'
+      limit 1
+    )
+    || '/functions/v1/notifiche-invia',
+
+
+    -- ---------------------------------------------------------------
+    -- HEADERS
+    -- ---------------------------------------------------------------
+
+    headers := jsonb_build_object(
+
+      'Content-Type',
+      'application/json',
+
+      'apikey',
+      (
+        select decrypted_secret
+        from vault.decrypted_secrets
+        where name = 'notifiche_publishable_key'
+        limit 1
+      ),
+
+      'x-cron-secret',
+      (
+        select decrypted_secret
+        from vault.decrypted_secrets
+        where name = 'notifiche_cron_secret'
+        limit 1
+      )
+
+    ),
+
+
+    -- ---------------------------------------------------------------
+    -- BODY
+    --
+    -- Indica alla Edge Function che deve eseguire il worker.
+    -- ---------------------------------------------------------------
+
+    body := jsonb_build_object(
+      'action',
+      'worker'
+    )
+
+  );
+
+  ",localhost,5432,postgres,postgres,true,notifiche-worker-ogni-minuto

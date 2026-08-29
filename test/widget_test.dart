@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:prog_mentore/app.dart';
+import 'package:prog_mentore/app/app.dart';
 
 void main() {
   testWidgets('mostra un errore di avvio leggibile', (tester) async {

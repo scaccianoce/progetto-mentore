@@ -1,0 +1,94 @@
+schema_name,enum_name,enumsortorder,enumlabel
+public,ambito_modifica,1,anagrafica
+public,ambito_modifica,2,insegnamento
+public,ambito_modifica,3,insegnamento_selezione
+public,ambito_modifica,4,insegnamento_creazione
+public,ambito_modifica,5,insegnamento_modifica
+public,ambito_modifica,6,insegnamento_non_richiesto
+public,anno_erogazione,1,1° anno
+public,anno_erogazione,2,2° anno
+public,anno_erogazione,3,3° anno
+public,anno_erogazione,4,4° anno
+public,anno_erogazione,5,5° anno
+public,anno_erogazione,6,6° anno
+public,app_role,1,owner
+public,app_role,2,organizer
+public,app_role,3,participant
+public,fascia_eta,1,<35
+public,fascia_eta,2,35-40
+public,fascia_eta,3,41-50
+public,fascia_eta,4,51-60
+public,fascia_eta,5,61-70
+public,fascia_eta,6,>70
+public,modalita_svolgimento,1,In presenza
+public,modalita_svolgimento,2,A distanza
+public,modalita_svolgimento,3,Misto
+public,notifiche_piattaforma,1,android
+public,notifiche_piattaforma,2,ios
+public,notifiche_piattaforma,3,web
+public,notifiche_stato_destinatario,1,da_inviare
+public,notifiche_stato_destinatario,2,inviato
+public,notifiche_stato_destinatario,3,letto
+public,notifiche_stato_destinatario,4,errore
+public,notifiche_stato_destinatario,5,escluso_inattivo
+public,notifiche_stato_destinatario,6,senza_dispositivo
+public,notifiche_stato_messaggio,1,bozza
+public,notifiche_stato_messaggio,2,programmato
+public,notifiche_stato_messaggio,3,da_inviare
+public,notifiche_stato_messaggio,4,in_invio
+public,notifiche_stato_messaggio,5,inviato
+public,notifiche_stato_messaggio,6,parziale
+public,notifiche_stato_messaggio,7,annullato
+public,notifiche_stato_messaggio,8,errore
+public,notifiche_tipo_attivazione,1,insert
+public,notifiche_tipo_attivazione,2,update
+public,notifiche_tipo_attivazione,3,data
+public,notifiche_tipo_attivazione,4,programmata
+public,notifiche_tipo_destinatari,1,tutti
+public,notifiche_tipo_destinatari,2,participant
+public,notifiche_tipo_destinatari,3,mentor
+public,notifiche_tipo_destinatari,4,senior
+public,notifiche_tipo_destinatari,5,mentee
+public,notifiche_tipo_destinatari,6,mentor_senior
+public,notifiche_tipo_destinatari,7,mentor_senior_mentee
+public,notifiche_tipo_destinatari,8,iscritti_evento
+public,notifiche_tipo_destinatari,9,iscritti_house_of_mentore
+public,notifiche_tipo_destinatari,10,anno_accademico
+public,notifiche_tipo_destinatari,11,manuale
+public,notifiche_tipo_destinatari,12,relazionale
+public,numero_mentoraggi_precedenti,1,1 volta
+public,numero_mentoraggi_precedenti,2,2 volte
+public,numero_mentoraggi_precedenti,3,3 o più volte
+public,preferenza_periodo_mentore_enum,1,Soltanto nel primo semestre
+public,preferenza_periodo_mentore_enum,2,Soltanto nel secondo semestre
+public,preferenza_periodo_mentore_enum,3,Una volta per semestre
+public,preferenza_periodo_mentore_enum,4,"Soltanto in uno dei due semestri, non è importante quale"
+public,preferenza_periodo_mentore_enum,5,Indifferente
+public,questionario_destinatario,1,partecipanti
+public,questionario_destinatario,2,studenti
+public,questionario_provider,1,interno
+public,questionario_provider,2,pubblico
+public,questionario_tipo_domanda,1,testo_breve
+public,questionario_tipo_domanda,2,testo_lungo
+public,questionario_tipo_domanda,3,booleano
+public,questionario_tipo_domanda,4,scelta_singola
+public,questionario_tipo_domanda,5,scala
+public,ruolo_accademico,1,PO
+public,ruolo_accademico,2,PA
+public,ruolo_accademico,3,RU
+public,ruolo_accademico,4,RTT
+public,ruolo_accademico,5,RTDb
+public,ruolo_accademico,6,RTDa
+public,ruolo_accademico,7,altro
+public,semestre_erogazione,1,I semestre
+public,semestre_erogazione,2,Annuale
+public,semestre_erogazione,3,II semestre
+public,stato_mentoraggio,1,Non iniziato
+public,stato_mentoraggio,2,In corso
+public,stato_mentoraggio,3,Completato
+public,tipo_mentore,1,senior
+public,tipo_mentore,2,mentor
+public,tipologia_evento,1,Incontro di approfondimento
+public,tipologia_evento,2,Seminario
+public,tipologia_evento,3,Workshop
+public,tipologia_evento,4,Altro

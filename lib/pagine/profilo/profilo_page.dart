@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../app_exception.dart';
-import '../../dinamico/maschera_dinamica_controller.dart';
-import '../../dinamico/maschera_dinamica_widget.dart';
-import '../../sessione_controller.dart';
-import '../template/pagina_scheda_dinamica.dart';
+import '../../app/app_core.dart';
+import '../../ui/dinamico_schema.dart';
+import '../../ui/dinamico_maschera.dart';
+import '../../app/app_session_controller.dart';
+import '../../supporto/utilita.dart';
 import 'profilo_controller.dart';
 
+/// Pagina dedicata a profilo.
 class ProfiloPage extends StatefulWidget {
   const ProfiloPage({super.key, required this.sessione});
 
@@ -16,7 +17,22 @@ class ProfiloPage extends StatefulWidget {
   State<ProfiloPage> createState() => _ProfiloPageState();
 }
 
+/// Stato interno della pagina; coordina rendering e interazioni della UI.
 class _ProfiloPageState extends State<ProfiloPage> {
+  /// Ordine dei campi nella sola visualizzazione del profilo.
+  ///
+  /// La maschera di modifica continua a seguire la propria configurazione e
+  /// può quindi evolvere indipendentemente da questa lista.
+  static const _ordineVisualizzazione = <String>[
+    'nome',
+    'cognome',
+    'email_unipa',
+    'cellulare',
+    'cod_ssd',
+    'anno_prima_partecipazione',
+    'pagina_personale_unipa',
+  ];
+
   late final ProfiloController _controller;
 
   bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
@@ -24,6 +40,15 @@ class _ProfiloPageState extends State<ProfiloPage> {
   ConfigurazionePaginaDinamica get _configurazione =>
       ConfigurazionePaginaDinamica(
         tabella: 'anagrafica',
+        ordineCampi: const <String>[
+          'nome',
+          'cognome',
+          'email_unipa',
+          'cellulare',
+          'cod_ssd',
+          'anno_prima_partecipazione',
+          'pagina_personale_unipa',
+        ],
         campi: <String, PersonalizzazioneCampo>{
           'user_id': const PersonalizzazioneCampo(nascosto: true),
           'email_unipa': const PersonalizzazioneCampo(solaLettura: true),
@@ -40,54 +65,166 @@ class _ProfiloPageState extends State<ProfiloPage> {
         },
       );
 
+  /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
   void initState() {
     super.initState();
     _controller = ProfiloController(sessione: widget.sessione)..carica();
   }
 
+  /// Rilascia listener e controller associati allo stato della pagina.
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: _controller,
     builder: (context, _) {
       final profilo = _controller.profilo;
       final cardPartecipazione = _cardPartecipazione(context);
+      if (_controller.caricamento && profilo == null) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-      return PaginaSchedaDinamica(
-        titolo: 'Il mio profilo',
-        configurazione: _configurazione,
-        valori: profilo,
-        partecipante: _partecipante,
-        caricamento: _controller.caricamento && profilo == null,
-        errore: _controller.errore,
-        vuoto: profilo == null,
-        messaggioVuoto: 'Profilo non trovato.',
-        primaDeiCampi: cardPartecipazione == null
-            ? const <Widget>[]
-            : <Widget>[cardPartecipazione, const SizedBox(height: 20)],
-        azioni: <Widget>[
-          if (_controller.puoModificare)
-            FilledButton.icon(
-              onPressed: _controller.salvataggio ? null : _apriEditor,
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Modifica'),
-            )
-          else
-            OutlinedButton.icon(
-              onPressed: _controller.richiediModifica,
-              icon: const Icon(Icons.lock_open_outlined),
-              label: const Text('Richiedi modifica'),
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 900),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        'Il mio profilo',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _controller.salvataggioPassword
+                          ? null
+                          : _cambiaPassword,
+                      icon: const Icon(Icons.password_outlined),
+                      label: const Text('Modifica password'),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_controller.puoModificare)
+                      FilledButton.icon(
+                        onPressed: _controller.salvataggio ? null : _apriEditor,
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Modifica'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: _controller.richiediModifica,
+                        icon: const Icon(Icons.lock_open_outlined),
+                        label: const Text('Richiedi modifica'),
+                      ),
+                  ],
+                ),
+                if (_controller.errore != null) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    _controller.errore!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Expanded(
+                  child: profilo == null
+                      ? const Center(child: Text('Profilo non trovato.'))
+                      : ListView(
+                          children: <Widget>[
+                            _campiProfilo(profilo),
+                            if (cardPartecipazione != null) ...<Widget>[
+                              const SizedBox(height: 20),
+                              cardPartecipazione,
+                            ],
+                            const SizedBox(height: 20),
+                            _storicoPartecipazioni(),
+                          ],
+                        ),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
       );
     },
   );
+
+  /// Visualizza i campi anagrafici nell'ordine specifico della pagina Profilo.
+  Widget _campiProfilo(Map<String, dynamic> valori) =>
+      FutureBuilder<SchemaDatabase>(
+        future: _controller.caricaSchemaDatabase(),
+        builder: (context, snapshot) {
+          final tabella = ConfigurazioneMaschere.applica(
+            snapshot.data?.tabella(_configurazione.tabella) ??
+                TabellaDatabase.daRiga(_configurazione.tabella, valori),
+            pagina: _configurazione,
+          );
+          final campi = tabella.campi
+              .where(
+                (campo) =>
+                    campo.visibilePer(partecipante: _partecipante) &&
+                    valori.containsKey(campo.nome),
+              )
+              .toList(growable: false);
+
+          int posizione(String nome) {
+            final indice = _ordineVisualizzazione.indexOf(nome);
+            return indice < 0 ? 1000 : indice;
+          }
+
+          campi.sort((a, b) {
+            final confronto = posizione(a.nome).compareTo(posizione(b.nome));
+            return confronto != 0
+                ? confronto
+                : a.etichetta.compareTo(b.etichetta);
+          });
+
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  for (final campo in campi)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        campo.etichetta,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: _valoreProfilo(campo, valori[campo.nome]),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+  /// Converte un valore del profilo nel widget di sola lettura.
+  Widget _valoreProfilo(CampoDatabase campo, Object? valore) {
+    final testo = switch (valore) {
+      null => '',
+      bool value => value ? 'Sì' : 'No',
+      _ => valore.toString(),
+    };
+    if (campo.tipo == TipoCampoDinamico.testoFormattato) {
+      return TestoHtmlMinimo(testo: testo);
+    }
+    return SelectableText(testo.trim().isEmpty ? '—' : testo);
+  }
 
   Widget? _cardPartecipazione(BuildContext context) {
     final stato = _controller.partecipazioneAnnuale;
@@ -145,38 +282,149 @@ class _ProfiloPageState extends State<ProfiloPage> {
         ),
       );
     }
+    return null;
+  }
 
-    final testo = switch (stato.stato) {
-      'confermato' => stato.soloMentore == true
-          ? 'Partecipazione confermata come solo mentore. Per questo anno '
-                'accademico non è necessario indicare un insegnamento da '
-                'mentorare.'
-          : 'Partecipazione confermata. Quando il backoffice abiliterà la fase '
-                'insegnamenti, potrai confermare o inserire l’insegnamento da '
-                '“I miei insegnamenti”.',
-      'nuovo' => 'Partecipazione registrata come nuovo partecipante.',
-      'rinuncia' =>
-        'Hai indicato che non parteciperai nell’anno accademico $anno. '
-            'Il tuo account e lo storico restano comunque disponibili.',
-      'sospeso' => 'Partecipazione temporaneamente sospesa dal backoffice.',
-      _ => 'Stato partecipazione: ${stato.stato ?? '—'}',
-    };
-
+  /// Mostra le risposte storiche raggruppate per anno accademico.
+  Widget _storicoPartecipazioni() {
+    final partecipazioni = _controller.partecipazioniAnnuali;
     return Card(
-      child: ListTile(
-        leading: Icon(
-          stato.confermata || stato.nuovo
-              ? Icons.check_circle_outline
-              : stato.rinuncia
-              ? Icons.event_busy_outlined
-              : Icons.info_outline,
-        ),
-        title: Text('Partecipazione $anno'),
-        subtitle: Text(testo),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Partecipazioni per anno accademico',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Aggiorna partecipazioni',
+                  onPressed: _controller.caricamento
+                      ? null
+                      : _controller.carica,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+          ),
+          if (partecipazioni.isEmpty)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
+              child: Text(
+                'Nessuna partecipazione annuale associata a questo account.',
+              ),
+            ),
+          for (
+            var indice = 0;
+            indice < partecipazioni.length;
+            indice++
+          ) ...<Widget>[
+            if (indice > 0) const Divider(height: 1),
+            _tilePartecipazione(partecipazioni[indice]),
+          ],
+        ],
       ),
     );
   }
 
+  Widget _tilePartecipazione(PartecipazioneAnnualeProfilo partecipazione) {
+    final righe =
+        <({String etichetta, Object? valore})>[
+          (etichetta: 'Stato', valore: _etichettaStato(partecipazione.stato)),
+          (etichetta: 'Risposta inviata', valore: partecipazione.rispostaAt),
+          (
+            etichetta: 'Periodo preferito per l’attività di mentore',
+            valore: partecipazione.preferenzaPeriodoMentore,
+          ),
+          (
+            etichetta: 'Note sull’attività di mentore',
+            valore: partecipazione.noteAttivitaMentore,
+          ),
+          (
+            etichetta: 'Solo attività di mentore',
+            valore: partecipazione.soloMentore,
+          ),
+          (
+            etichetta: 'Valutazione dei mentori precedenti',
+            valore: partecipazione.valutazioneMentoriPrecedenti,
+          ),
+          (
+            etichetta: 'Richiesta di cambiare mentore',
+            valore: partecipazione.cambiareMentore,
+          ),
+          (
+            etichetta: 'Note sui mentori',
+            valore: partecipazione.noteSuiMentori,
+          ),
+          (
+            etichetta: 'Indicazioni sui mentee seguiti',
+            valore: partecipazione.cambiareMenteeSeguiti,
+          ),
+          (
+            etichetta: 'Disponibile per il mentoring degli esami',
+            valore: partecipazione.disponibileMentoringEsami,
+          ),
+          (
+            etichetta: 'Segnalazioni e suggerimenti',
+            valore: partecipazione.segnalazioniSuggerimenti,
+          ),
+        ].where(
+          (riga) =>
+              riga.valore != null && riga.valore.toString().trim().isNotEmpty,
+        );
+
+    return ExpansionTile(
+      key: ValueKey<String?>(partecipazione.annoAccademico),
+      leading: Icon(_iconaStato(partecipazione.stato)),
+      title: Text(partecipazione.annoAccademico ?? 'Anno non indicato'),
+      subtitle: Text(_etichettaStato(partecipazione.stato)),
+      childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+      children: <Widget>[
+        for (final riga in righe)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(
+              riga.etichetta,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: SelectableText(_formattaRispostaAnnuale(riga.valore)),
+          ),
+      ],
+    );
+  }
+
+  String _formattaRispostaAnnuale(Object? valore) => switch (valore) {
+    DateTime data => formattaData(data),
+    bool risposta => risposta ? 'Sì' : 'No',
+    _ => valore?.toString() ?? '—',
+  };
+
+  String _etichettaStato(String? stato) => switch (stato) {
+    'da_contattare' => 'Da confermare',
+    'confermato' => 'Partecipazione confermata',
+    'rinuncia' => 'Non partecipa',
+    'nuovo' => 'Nuovo partecipante',
+    'sospeso' => 'Partecipazione sospesa',
+    _ => 'Stato non indicato',
+  };
+
+  IconData _iconaStato(String? stato) => switch (stato) {
+    'confermato' || 'nuovo' => Icons.check_circle_outline,
+    'rinuncia' => Icons.event_busy_outlined,
+    'sospeso' => Icons.pause_circle_outline,
+    _ => Icons.info_outline,
+  };
+
+  /// Gestisce l’operazione interna “rispondi partecipazione” della pagina.
   Future<void> _rispondiPartecipazione(bool partecipa) async {
     try {
       await _controller.rispondiPartecipazione(partecipa);
@@ -188,6 +436,7 @@ class _ProfiloPageState extends State<ProfiloPage> {
     }
   }
 
+  /// Apre ricognizione annuale.
   Future<void> _apriRicognizioneAnnuale() async {
     final stato = _controller.partecipazioneAnnuale;
     if (stato == null || stato.annoAccademico == null) return;
@@ -222,6 +471,97 @@ class _ProfiloPageState extends State<ProfiloPage> {
     }
   }
 
+  /// Gestisce l’operazione interna “cambia password” della pagina.
+  Future<void> _cambiaPassword() async {
+    final password = TextEditingController();
+    final conferma = TextEditingController();
+    String? errore;
+
+    final nuovaPassword = await showDialog<String>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Modifica password'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nuova password',
+                    helperText: 'Minimo 8 caratteri',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: conferma,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Conferma nuova password',
+                  ),
+                ),
+                if (errore != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      errore!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annulla'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final valore = password.text;
+                if (valore.length < 8) {
+                  setState(() => errore = 'Inserisci almeno 8 caratteri.');
+                  return;
+                }
+                if (valore != conferma.text) {
+                  setState(() => errore = 'Le password non coincidono.');
+                  return;
+                }
+                Navigator.pop(context, valore);
+              },
+              child: const Text('Salva password'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    password.dispose();
+    conferma.dispose();
+    if (nuovaPassword == null) return;
+
+    try {
+      await _controller.cambiaPassword(nuovaPassword);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password modificata correttamente.')),
+      );
+    } on AppException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.messaggio)));
+    }
+  }
+
+  /// Apre editor.
   Future<void> _apriEditor() async {
     final valori = await mostraMascheraDinamica(
       context: context,
@@ -243,6 +583,7 @@ class _ProfiloPageState extends State<ProfiloPage> {
   }
 }
 
+/// Modello o componente interno “RicognizioneAnnualeDialog” usato esclusivamente da questo file.
 class _RicognizioneAnnualeDialog extends StatefulWidget {
   const _RicognizioneAnnualeDialog({
     required this.annoAccademico,
@@ -257,6 +598,7 @@ class _RicognizioneAnnualeDialog extends StatefulWidget {
       _RicognizioneAnnualeDialogState();
 }
 
+/// Stato interno della pagina; coordina rendering e interazioni della UI.
 class _RicognizioneAnnualeDialogState
     extends State<_RicognizioneAnnualeDialog> {
   final _form = GlobalKey<FormState>();
@@ -280,6 +622,7 @@ class _RicognizioneAnnualeDialogState
     'Indifferente',
   ];
 
+  /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
   void initState() {
     super.initState();
@@ -305,6 +648,7 @@ class _RicognizioneAnnualeDialogState
     );
   }
 
+  /// Rilascia listener e controller associati allo stato della pagina.
   @override
   void dispose() {
     _noteAttivitaMentore.dispose();
@@ -314,6 +658,7 @@ class _RicognizioneAnnualeDialogState
     super.dispose();
   }
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -335,7 +680,8 @@ class _RicognizioneAnnualeDialogState
                   initialValue: _preferenzaPeriodo,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Quando preferiresti svolgere la funzione di mentore?',
+                    labelText:
+                        'Quando preferiresti svolgere la funzione di mentore?',
                     border: OutlineInputBorder(),
                   ),
                   items: [
@@ -471,26 +817,25 @@ class _RicognizioneAnnualeDialogState
     );
   }
 
+  /// Gestisce l’operazione interna “salva” della pagina.
   void _salva() {
     if (!(_form.currentState?.validate() ?? false)) return;
 
-    Navigator.pop(
-      context,
-      <String, dynamic>{
-        'preferenza_periodo_mentore': _preferenzaPeriodo,
-        'note_attivita_mentore': _noteAttivitaMentore.text,
-        'solo_mentore': _soloMentore,
-        'valutazione_mentori_precedenti': _valutazioneMentori,
-        'cambiare_mentore': _cambiareMentore,
-        'note_sui_mentori': _noteSuiMentori.text,
-        'cambiare_mentee_seguiti': _cambiareMenteeSeguiti.text,
-        'disponibile_mentoring_esami': _mentoringEsami,
-        'segnalazioni_suggerimenti': _segnalazioniSuggerimenti.text,
-      },
-    );
+    Navigator.pop(context, <String, dynamic>{
+      'preferenza_periodo_mentore': _preferenzaPeriodo,
+      'note_attivita_mentore': _noteAttivitaMentore.text,
+      'solo_mentore': _soloMentore,
+      'valutazione_mentori_precedenti': _valutazioneMentori,
+      'cambiare_mentore': _cambiareMentore,
+      'note_sui_mentori': _noteSuiMentori.text,
+      'cambiare_mentee_seguiti': _cambiareMenteeSeguiti.text,
+      'disponibile_mentoring_esami': _mentoringEsami,
+      'segnalazioni_suggerimenti': _segnalazioniSuggerimenti.text,
+    });
   }
 }
 
+/// Modello o componente interno “SceltaSiNo” usato esclusivamente da questo file.
 class _SceltaSiNo extends StatelessWidget {
   const _SceltaSiNo({
     required this.titolo,
@@ -502,6 +847,7 @@ class _SceltaSiNo extends StatelessWidget {
   final bool? valore;
   final ValueChanged<bool?> onChanged;
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) {
     return InputDecorator(

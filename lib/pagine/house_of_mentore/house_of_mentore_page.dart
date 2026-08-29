@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../dinamico/maschera_dinamica_controller.dart';
-import '../../dinamico/maschera_dinamica_widget.dart';
-import '../../sessione_controller.dart';
-import '../template/componenti_pagina_dinamica.dart';
-import '../template/template_elenco_dettaglio_page.dart';
+import '../../ui/dinamico_schema.dart';
+import '../../ui/dinamico_maschera.dart';
+import '../../app/app_session_controller.dart';
+import '../../supporto/utilita.dart';
 import 'house_of_mentore_controller.dart';
 
+/// Pagina dedicata a house of mentore.
 class HouseOfMentorePage extends StatefulWidget {
   const HouseOfMentorePage({super.key, required this.sessione});
 
@@ -16,16 +16,37 @@ class HouseOfMentorePage extends StatefulWidget {
   State<HouseOfMentorePage> createState() => _HouseOfMentorePageState();
 }
 
+/// Stato interno della pagina; coordina rendering e interazioni della UI.
 class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
+  /// Ordine dei campi nella visualizzazione della singola iniziativa.
+  static const _ordineVisualizzazione = <String>[
+    'titolo',
+    'anno_accademico',
+    'data_evento',
+    'luogo',
+    'descrizione',
+    'iscrizioni_aperte',
+  ];
+
   late final HouseOfMentoreController controller;
 
   bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
 
-  /// PERSONALIZZAZIONE HOUSE OF MENTORE:
-  /// il layout resta nel template, qui rimangono solo tipi e vincoli speciali.
+  /// Configurazione della sola maschera di modifica House of Mentore.
+  ///
+  /// Il layout di visualizzazione resta interamente in questa pagina.
   ConfigurazionePaginaDinamica get _configurazioneEvento =>
       ConfigurazionePaginaDinamica(
         tabella: 'house_of_mentore',
+        ordineCampi: const <String>[
+          'titolo',
+          'anno_accademico',
+          'data_evento',
+          'luogo',
+          'descrizione',
+          'iscrizioni_aperte',
+          'attiva',
+        ],
         campi: <String, PersonalizzazioneCampo>{
           'titolo': const PersonalizzazioneCampo(
             modificabilePartecipante: false,
@@ -53,66 +74,150 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
 
   static const _configurazioneOpzione = ConfigurazionePaginaDinamica(
     tabella: 'house_of_mentore_opzioni',
+    ordineCampi: <String>[
+      'descrizione',
+      'ordine_visualizzazione',
+    ],
     campi: <String, PersonalizzazioneCampo>{
       'evento_id': PersonalizzazioneCampo(nascosto: true),
     },
   );
 
+  /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
   void initState() {
     super.initState();
     controller = HouseOfMentoreController(widget.sessione)..carica();
   }
 
+  /// Rilascia listener e controller associati allo stato della pagina.
   @override
   void dispose() {
     controller.dispose();
     super.dispose();
   }
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
-    builder: (context, _) => TemplatePaginaElencoDettaglio(
-      caricamento: controller.caricamento && controller.eventi.isEmpty,
-      errore: controller.errore,
-      vuoto: controller.eventi.isEmpty,
-      messaggioVuoto: 'Nessuna iniziativa disponibile.',
-      larghezzaElenco: 340,
-      intestazione: IntestazionePaginaDinamica(
-        titolo: 'House of Mentore',
-        onAggiorna: controller.carica,
-        onNuovo: controller.puoGestire ? () => _apriEditorEvento() : null,
-      ),
-      elenco: ElencoRecordDinamico<Map<String, dynamic>>(
-        elementi: controller.eventi,
-        idSelezionato: controller.eventoSelezionatoId,
-        id: (evento) => evento['id'].toString(),
-        titolo: (evento) => _testo(evento['titolo']),
-        sottotitolo: (evento) =>
-            '${_data(evento['data_evento'])} · ${_testo(evento['anno_accademico'])}',
-        leading: (_) => const Icon(Icons.home_work_outlined),
-        trailing: (evento) =>
-            controller.iscrizione(evento['id'].toString()) == null
-            ? null
-            : const Icon(Icons.check_circle, color: Colors.green),
-        onSeleziona: controller.seleziona,
-      ),
-      dettaglio: controller.eventoSelezionato == null
-          ? const Center(child: Text('Seleziona un’iniziativa.'))
-          : Card(
-              margin: EdgeInsets.zero,
-              child: _dettaglio(controller.eventoSelezionato!),
+    builder: (context, _) {
+      if (controller.caricamento && controller.eventi.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'House of Mentore',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Aggiorna',
+                  onPressed: controller.carica,
+                  icon: const Icon(Icons.refresh),
+                ),
+                if (controller.puoGestire)
+                  FilledButton.icon(
+                    onPressed: () => _apriEditorEvento(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Nuovo'),
+                  ),
+              ],
             ),
+            if (controller.errore != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                controller.errore!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: controller.eventi.isEmpty
+                  ? const Center(child: Text('Nessuna iniziativa disponibile.'))
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final elenco = _elencoEventi();
+                        final selezionato = controller.eventoSelezionato;
+                        final dettaglio = selezionato == null
+                            ? const Center(
+                                child: Text('Seleziona un’iniziativa.'),
+                              )
+                            : Card(
+                                margin: EdgeInsets.zero,
+                                child: _dettaglio(selezionato),
+                              );
+                        if (constraints.maxWidth >= 800) {
+                          return Row(
+                            children: <Widget>[
+                              SizedBox(width: 340, child: elenco),
+                              const VerticalDivider(width: 24),
+                              Expanded(child: dettaglio),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: <Widget>[
+                            Expanded(child: elenco),
+                            const Divider(height: 20),
+                            Expanded(child: dettaglio),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+
+  /// Costruisce localmente l'elenco delle iniziative House of Mentore.
+  Widget _elencoEventi() => Card(
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    child: ListView.separated(
+      itemCount: controller.eventi.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final evento = controller.eventi[index];
+        final id = evento['id'].toString();
+        return ListTile(
+          selected: id == controller.eventoSelezionatoId,
+          leading: const Icon(Icons.home_work_outlined),
+          title: Text(
+            testoDa(evento['titolo']),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(
+            '${_data(evento['data_evento'])} · ${testoDa(evento['anno_accademico'])}',
+          ),
+          trailing: controller.iscrizione(id) == null
+              ? null
+              : const Icon(Icons.check_circle, color: Colors.green),
+          onTap: () => controller.seleziona(evento),
+        );
+      },
     ),
   );
 
+
+  /// Costruisce il pannello di dettaglio.
   Widget _dettaglio(Map<String, dynamic> evento) {
     final eventoId = evento['id'].toString();
     final opzioni = controller.opzioni(eventoId);
     final iscrizione = controller.iscrizione(eventoId);
     final iscrizioniAperte = evento['iscrizioni_aperte'] == true;
-    final locandina = _testo(evento['locandina_url']);
+    final locandina = testoDa(evento['locandina_url']);
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -130,11 +235,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
               ),
             ),
           ),
-        CampiTabellaDinamici(
-          configurazione: _configurazioneEvento,
-          valori: evento,
-          partecipante: _partecipante,
-        ),
+        _campiEvento(evento),
         const Divider(height: 32),
         Row(
           children: <Widget>[
@@ -207,6 +308,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     );
   }
 
+  /// Costruisce o restituisce l’elenco di iscritti.
   Widget _elencoIscritti(Map<String, dynamic> evento) {
     final eventoId = evento['id'].toString();
     final iscritti = controller.iscritti(eventoId);
@@ -275,6 +377,62 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     );
   }
 
+
+  /// Visualizza i campi dell'iniziativa con ordine autonomo della pagina.
+  Widget _campiEvento(Map<String, dynamic> valori) =>
+      FutureBuilder<SchemaDatabase>(
+        future: controller.caricaSchemaDatabase(),
+        builder: (context, snapshot) {
+          final tabella = ConfigurazioneMaschere.applica(
+            snapshot.data?.tabella(_configurazioneEvento.tabella) ??
+                TabellaDatabase.daRiga(_configurazioneEvento.tabella, valori),
+            pagina: _configurazioneEvento,
+          );
+          final campi = tabella.campi
+              .where(
+                (campo) => campo.visibilePer(partecipante: _partecipante) &&
+                    valori.containsKey(campo.nome),
+              )
+              .toList(growable: false);
+
+          int posizione(String nome) {
+            final indice = _ordineVisualizzazione.indexOf(nome);
+            return indice < 0 ? 1000 : indice;
+          }
+          campi.sort((a, b) {
+            final confronto = posizione(a.nome).compareTo(posizione(b.nome));
+            return confronto != 0
+                ? confronto
+                : a.etichetta.compareTo(b.etichetta);
+          });
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              for (final campo in campi)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    campo.etichetta,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: campo.tipo == TipoCampoDinamico.testoFormattato
+                      ? TestoHtmlMinimo(
+                          testo: valori[campo.nome]?.toString() ?? '',
+                        )
+                      : SelectableText(
+                          (valori[campo.nome]?.toString().trim().isEmpty ?? true)
+                              ? '—'
+                              : valori[campo.nome].toString(),
+                        ),
+                ),
+            ],
+          );
+        },
+      );
+
+
+  /// Gestisce l’operazione interna “scegli” della pagina.
   Future<void> _scegli(String eventoId, String opzioneId) async {
     final errore = await controller.scegliOpzione(
       eventoId: eventoId,
@@ -283,6 +441,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Scelta registrata.');
   }
 
+  /// Gestisce l’operazione interna “cancella iscrizione” della pagina.
   Future<void> _cancellaIscrizione(String eventoId) async {
     final conferma = await _conferma(
       'Cancellare l’iscrizione?',
@@ -293,6 +452,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Iscrizione cancellata.');
   }
 
+  /// Apre editor evento.
   Future<void> _apriEditorEvento([Map<String, dynamic>? evento]) async {
     final dati = await mostraMascheraDinamica(
       context: context,
@@ -317,6 +477,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Evento salvato.');
   }
 
+  /// Apre editor opzione.
   Future<void> _apriEditorOpzione(
     String eventoId, {
     Map<String, dynamic>? opzione,
@@ -344,6 +505,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Alternativa salvata.');
   }
 
+  /// Elimina evento.
   Future<void> _eliminaEvento(Map<String, dynamic> evento) async {
     final conferma = await _conferma(
       'Eliminare House of Mentore?',
@@ -354,16 +516,18 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     _esito(errore, 'Evento eliminato.');
   }
 
+  /// Elimina opzione.
   Future<void> _eliminaOpzione(Map<String, dynamic> opzione) async {
     final conferma = await _conferma(
       'Eliminare l’alternativa?',
-      _testo(opzione['descrizione']),
+      testoDa(opzione['descrizione']),
     );
     if (!conferma) return;
     final errore = await controller.eliminaOpzione(opzione['id'].toString());
     _esito(errore, 'Alternativa eliminata.');
   }
 
+  /// Gestisce l’operazione interna “conferma” della pagina.
   Future<bool> _conferma(String titolo, String testo) async =>
       await showDialog<bool>(
         context: context,
@@ -384,6 +548,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
       ) ??
       false;
 
+  /// Gestisce l’operazione interna “esito” della pagina.
   void _esito(String? errore, String successo) {
     if (!mounted) return;
     ScaffoldMessenger.of(
@@ -392,6 +557,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
   }
 }
 
+/// Modello o componente interno “OpzioneTile” usato esclusivamente da questo file.
 class _OpzioneTile extends StatelessWidget {
   const _OpzioneTile({
     required this.opzione,
@@ -411,6 +577,7 @@ class _OpzioneTile extends StatelessWidget {
   final VoidCallback onModifica;
   final VoidCallback onElimina;
 
+  /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) => Card(
     child: ListTile(
@@ -422,7 +589,7 @@ class _OpzioneTile extends StatelessWidget {
             ? null
             : Theme.of(context).disabledColor,
       ),
-      title: Text(_testo(opzione['descrizione'])),
+      title: Text(testoDa(opzione['descrizione'])),
       onTap: abilitata ? onScegli : null,
       trailing: puoGestire
           ? PopupMenuButton<String>(
@@ -438,11 +605,7 @@ class _OpzioneTile extends StatelessWidget {
   );
 }
 
-String _testo(Object? valore) => valore?.toString().trim() ?? '';
-
+/// Gestisce l’operazione interna “data” della pagina.
 String _data(Object? valore) {
-  final data = valore is DateTime ? valore : DateTime.tryParse(_testo(valore));
-  if (data == null) return '—';
-  return '${data.day.toString().padLeft(2, '0')}/'
-      '${data.month.toString().padLeft(2, '0')}/${data.year}';
+  return formattaData(valore);
 }

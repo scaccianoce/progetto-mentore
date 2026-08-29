@@ -1,0 +1,276 @@
+table_schema,table_name,ordinal_position,column_name,data_type,udt_schema,udt_name,is_nullable,column_default,is_identity,identity_generation
+public,abilitazioni_modifica,1,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,abilitazioni_modifica,2,ambito,USER-DEFINED,public,ambito_modifica,NO,null,NO,null
+public,abilitazioni_modifica,3,anno_accademico,character varying,pg_catalog,varchar,NO,null,NO,null
+public,abilitazioni_modifica,4,richiesta_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,abilitazioni_modifica,5,abilitata,boolean,pg_catalog,bool,NO,false,NO,null
+public,abilitazioni_modifica,6,abilitata_da,uuid,pg_catalog,uuid,YES,null,NO,null
+public,abilitazioni_modifica,7,abilitata_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,abilitazioni_modifica,8,scade_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,abilitazioni_modifica,9,revocata_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,anagrafica,1,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,anagrafica,2,email_unipa,character varying,pg_catalog,varchar,NO,null,NO,null
+public,anagrafica,3,cognome,character varying,pg_catalog,varchar,NO,null,NO,null
+public,anagrafica,4,nome,character varying,pg_catalog,varchar,NO,null,NO,null
+public,anagrafica,5,cod_ssd,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica,6,dipartimento,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica,7,ufficio,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica,8,ruolo_accademico,USER-DEFINED,public,ruolo_accademico,YES,null,NO,null
+public,anagrafica,9,cellulare,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica,11,pagina_personale_unipa,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica,15,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,anagrafica,18,fascia_eta,USER-DEFINED,public,fascia_eta,YES,null,NO,null
+public,anagrafica,19,anno_prima_partecipazione,character varying,pg_catalog,varchar,YES,null,NO,null
+public,anagrafica_riservata,1,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,anagrafica_riservata,2,note_storiche,text,pg_catalog,text,YES,null,NO,null
+public,anagrafica_riservata,3,attivo,boolean,pg_catalog,bool,NO,true,NO,null
+public,anni_accademici,1,codice,character varying,pg_catalog,varchar,NO,null,NO,null
+public,anni_accademici,2,data_inizio,date,pg_catalog,date,YES,null,NO,null
+public,anni_accademici,3,data_fine,date,pg_catalog,date,YES,null,NO,null
+public,anni_accademici,4,corrente,boolean,pg_catalog,bool,NO,false,NO,null
+public,anni_accademici,5,stato,text,pg_catalog,text,NO,'chiuso'::text,NO,null
+public,eventi,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,eventi,2,titolo,character varying,pg_catalog,varchar,NO,null,NO,null
+public,eventi,3,anno_accademico,character varying,pg_catalog,varchar,NO,null,NO,null
+public,eventi,4,luogo,text,pg_catalog,text,YES,null,NO,null
+public,eventi,5,data_evento,date,pg_catalog,date,NO,null,NO,null
+public,eventi,6,tipologia,USER-DEFINED,public,tipologia_evento,NO,null,NO,null
+public,eventi,7,descrizione,text,pg_catalog,text,YES,null,NO,null
+public,eventi,8,modalita,USER-DEFINED,public,modalita_svolgimento,NO,null,NO,null
+public,eventi,9,relatori,text,pg_catalog,text,YES,null,NO,null
+public,eventi,10,moderatori,text,pg_catalog,text,YES,null,NO,null
+public,eventi,11,note_organizzative,text,pg_catalog,text,YES,null,NO,null
+public,eventi,12,locandina_url,text,pg_catalog,text,YES,null,NO,null
+public,eventi,14,data_apertura_iscrizioni,date,pg_catalog,date,YES,null,NO,null
+public,eventi,15,data_chiusura_iscrizioni,date,pg_catalog,date,YES,null,NO,null
+public,eventi,18,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,eventi,19,attiva,boolean,pg_catalog,bool,YES,true,NO,null
+public,house_of_mentore,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,house_of_mentore,2,titolo,text,pg_catalog,text,NO,null,NO,null
+public,house_of_mentore,3,descrizione,text,pg_catalog,text,YES,null,NO,null
+public,house_of_mentore,4,anno_accademico,character varying,pg_catalog,varchar,NO,null,NO,null
+public,house_of_mentore,5,data_evento,date,pg_catalog,date,YES,null,NO,null
+public,house_of_mentore,6,luogo,text,pg_catalog,text,YES,null,NO,null
+public,house_of_mentore,7,locandina_url,text,pg_catalog,text,YES,null,NO,null
+public,house_of_mentore,8,iscrizioni_aperte,boolean,pg_catalog,bool,NO,false,NO,null
+public,house_of_mentore,9,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,house_of_mentore,10,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,house_of_mentore_opzioni,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,house_of_mentore_opzioni,2,evento_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,house_of_mentore_opzioni,3,descrizione,text,pg_catalog,text,NO,null,NO,null
+public,house_of_mentore_opzioni,4,ordine_visualizzazione,integer,pg_catalog,int4,NO,0,NO,null
+public,import_insegnamenti,1,id,bigint,pg_catalog,int8,NO,null,YES,ALWAYS
+public,import_insegnamenti,2,email_docente,text,pg_catalog,text,NO,null,NO,null
+public,import_insegnamenti,3,insegnamento,text,pg_catalog,text,NO,null,NO,null
+public,import_insegnamenti,4,cfu,integer,pg_catalog,int4,YES,null,NO,null
+public,import_insegnamenti,5,cds,text,pg_catalog,text,YES,null,NO,null
+public,import_insegnamenti,6,importato,boolean,pg_catalog,bool,NO,false,NO,null
+public,import_insegnamenti,7,insegnamento_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,import_insegnamenti,8,errore,text,pg_catalog,text,YES,null,NO,null
+public,import_insegnamenti,9,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,import_insegnamenti,10,imported_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,import_insegnamenti,11,semestre,USER-DEFINED,public,semestre_erogazione,NO,null,NO,null
+public,import_insegnamenti,12,anno_erogazione,USER-DEFINED,public,anno_erogazione,YES,null,NO,null
+public,import_insegnamenti,13,ore,integer,pg_catalog,int4,YES,null,NO,null
+public,import_insegnamenti,14,mentoraggio_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,import_partecipanti,1,id,bigint,pg_catalog,int8,NO,null,YES,ALWAYS
+public,import_partecipanti,2,email_unipa,text,pg_catalog,text,NO,null,NO,null
+public,import_partecipanti,3,cognome,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,4,nome,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,5,password_temporanea,text,pg_catalog,text,NO,null,NO,null
+public,import_partecipanti,6,importato,boolean,pg_catalog,bool,NO,false,NO,null
+public,import_partecipanti,7,user_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,import_partecipanti,8,errore,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,9,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,import_partecipanti,10,imported_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,import_partecipanti,11,dipartimento,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,12,cellulare,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,13,ufficio,text,pg_catalog,text,YES,null,NO,null
+public,import_partecipanti,14,ruolo_accademico,USER-DEFINED,public,ruolo_accademico,YES,null,NO,null
+public,import_partecipanti,15,fascia_eta,USER-DEFINED,public,fascia_eta,YES,null,NO,null
+public,insegnamenti,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,insegnamenti,2,docente_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,insegnamenti,3,insegnamento,character varying,pg_catalog,varchar,NO,null,NO,null
+public,insegnamenti,4,semestre,USER-DEFINED,public,semestre_erogazione,NO,null,NO,null
+public,insegnamenti,5,cfu,numeric,pg_catalog,numeric,YES,null,NO,null
+public,insegnamenti,6,ore,integer,pg_catalog,int4,YES,null,NO,null
+public,insegnamenti,7,cds,character varying,pg_catalog,varchar,YES,null,NO,null
+public,insegnamenti,8,anno_erogazione,USER-DEFINED,public,anno_erogazione,YES,null,NO,null
+public,insegnamenti,17,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,mentoraggi,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,mentoraggi,2,insegnamento_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,mentoraggi,5,data_visita_1,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,6,data_visita_2,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,7,data_visita_3,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,8,data_visita_4,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,9,osservazioni_aula,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,10,data_focus_group,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,11,osservazioni_focus_group,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,12,link_questionario,character varying,pg_catalog,varchar,YES,null,NO,null
+public,mentoraggi,13,data_incontro_finale,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,14,scheda_sintesi,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,15,data_invio_scheda,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,16,stato,USER-DEFINED,public,stato_mentoraggio,NO,'Non iniziato'::stato_mentoraggio,NO,null
+public,mentoraggi,17,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,mentoraggi,18,data_inizio,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,19,data_fine,date,pg_catalog,date,YES,null,NO,null
+public,mentoraggi,20,anno_accademico,character varying,pg_catalog,varchar,NO,null,NO,null
+public,mentoraggi,21,numero_studenti,integer,pg_catalog,int4,YES,null,NO,null
+public,mentoraggi,22,sede,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,23,note,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,24,svolgimento,USER-DEFINED,public,modalita_svolgimento,YES,null,NO,null
+public,mentoraggi,25,giorni_orari_lezioni,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,26,scheda_sintesi_pdf_url,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggi,27,azioni_miglioramento,text,pg_catalog,text,YES,null,NO,null
+public,mentoraggio_mentori,1,mentoraggio_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,mentoraggio_mentori,2,mentore_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,mentoraggio_mentori,3,tipo,USER-DEFINED,public,tipo_mentore,NO,'mentor'::tipo_mentore,NO,null
+public,mentoraggio_mentori,4,assegnato_il,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,news,1,id,bigint,pg_catalog,int8,NO,null,YES,ALWAYS
+public,news,2,titolo,text,pg_catalog,text,NO,null,NO,null
+public,news,3,testo,text,pg_catalog,text,YES,null,NO,null
+public,news,4,data_pubblicazione,timestamp without time zone,pg_catalog,timestamp,YES,now(),NO,null
+public,news,5,attiva,boolean,pg_catalog,bool,YES,true,NO,null
+public,news,6,created_at,timestamp without time zone,pg_catalog,timestamp,YES,now(),NO,null
+public,news,7,updated_at,timestamp without time zone,pg_catalog,timestamp,YES,now(),NO,null
+public,notifiche_destinatari,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,notifiche_destinatari,2,messaggio_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,notifiche_destinatari,3,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,notifiche_destinatari,4,stato,USER-DEFINED,public,notifiche_stato_destinatario,NO,'da_inviare'::notifiche_stato_destinatario,NO,null
+public,notifiche_destinatari,5,inviato_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_destinatari,6,letto_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_destinatari,7,errore,text,pg_catalog,text,YES,null,NO,null
+public,notifiche_destinatari,8,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_destinatari,9,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_dispositivi,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,notifiche_dispositivi,2,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,notifiche_dispositivi,3,token,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_dispositivi,4,piattaforma,USER-DEFINED,public,notifiche_piattaforma,NO,null,NO,null
+public,notifiche_dispositivi,5,attivo,boolean,pg_catalog,bool,NO,true,NO,null
+public,notifiche_dispositivi,6,ultimo_accesso,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_dispositivi,7,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_dispositivi,8,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_messaggi,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,notifiche_messaggi,2,regola_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,notifiche_messaggi,3,anno_accademico,text,pg_catalog,text,NO,notifiche_anno_corrente(),NO,null
+public,notifiche_messaggi,4,titolo,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_messaggi,5,messaggio,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_messaggi,6,destinatari,USER-DEFINED,public,notifiche_tipo_destinatari,NO,null,NO,null
+public,notifiche_messaggi,7,destinatari_configurazione,jsonb,pg_catalog,jsonb,NO,'{}'::jsonb,NO,null
+public,notifiche_messaggi,8,origine_tabella,text,pg_catalog,text,YES,null,NO,null
+public,notifiche_messaggi,9,origine_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,notifiche_messaggi,10,chiave_univoca,text,pg_catalog,text,YES,null,NO,null
+public,notifiche_messaggi,11,programmata_per,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_messaggi,12,inviata_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_messaggi,13,stato,USER-DEFINED,public,notifiche_stato_messaggio,NO,'bozza'::notifiche_stato_messaggio,NO,null
+public,notifiche_messaggi,14,creata_da,uuid,pg_catalog,uuid,YES,null,NO,null
+public,notifiche_messaggi,15,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_messaggi,16,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_regole,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,notifiche_regole,2,codice,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_regole,3,descrizione,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_regole,4,attiva,boolean,pg_catalog,bool,NO,true,NO,null
+public,notifiche_regole,5,tipo_attivazione,USER-DEFINED,public,notifiche_tipo_attivazione,NO,null,NO,null
+public,notifiche_regole,6,tabella,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_regole,7,campo_data,text,pg_catalog,text,YES,null,NO,null
+public,notifiche_regole,8,offset_giorni,integer,pg_catalog,int4,NO,0,NO,null
+public,notifiche_regole,9,destinatari,USER-DEFINED,public,notifiche_tipo_destinatari,NO,null,NO,null
+public,notifiche_regole,10,configurazione,jsonb,pg_catalog,jsonb,NO,'{}'::jsonb,NO,null
+public,notifiche_regole,11,titolo_template,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_regole,12,messaggio_template,text,pg_catalog,text,NO,null,NO,null
+public,notifiche_regole,13,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_regole,14,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,notifiche_regole,15,data_programmata,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,notifiche_utenti_attivi,1,user_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,notifiche_utenti_attivi,2,nome,character varying,pg_catalog,varchar,YES,null,NO,null
+public,notifiche_utenti_attivi,3,cognome,character varying,pg_catalog,varchar,YES,null,NO,null
+public,notifiche_utenti_attivi,4,email_unipa,character varying,pg_catalog,varchar,YES,null,NO,null
+public,notifiche_utenti_attivi,5,role,USER-DEFINED,public,app_role,YES,null,NO,null
+public,partecipazioni_annuali,1,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_annuali,2,anno_accademico,character varying,pg_catalog,varchar,NO,null,NO,null
+public,partecipazioni_annuali,3,stato,text,pg_catalog,text,NO,'da_contattare'::text,NO,null
+public,partecipazioni_annuali,4,richiesta_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,partecipazioni_annuali,5,risposta_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,partecipazioni_annuali,6,aggiornato_da,uuid,pg_catalog,uuid,YES,null,NO,null
+public,partecipazioni_annuali,7,note,text,pg_catalog,text,YES,null,NO,null
+public,partecipazioni_annuali,8,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,partecipazioni_annuali,9,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,partecipazioni_annuali,10,confermato_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,partecipazioni_annuali,11,confermato_da,uuid,pg_catalog,uuid,YES,null,NO,null
+public,partecipazioni_annuali,12,preferenza_periodo_mentore,USER-DEFINED,public,preferenza_periodo_mentore_enum,YES,null,NO,null
+public,partecipazioni_annuali,13,note_attivita_mentore,text,pg_catalog,text,YES,null,NO,null
+public,partecipazioni_annuali,14,solo_mentore,boolean,pg_catalog,bool,NO,false,NO,null
+public,partecipazioni_annuali,15,valutazione_mentori_precedenti,smallint,pg_catalog,int2,YES,null,NO,null
+public,partecipazioni_annuali,16,cambiare_mentore,boolean,pg_catalog,bool,YES,null,NO,null
+public,partecipazioni_annuali,17,cambiare_mentee_seguiti,text,pg_catalog,text,YES,null,NO,null
+public,partecipazioni_annuali,18,disponibile_mentoring_esami,boolean,pg_catalog,bool,YES,null,NO,null
+public,partecipazioni_annuali,19,segnalazioni_suggerimenti,text,pg_catalog,text,YES,null,NO,null
+public,partecipazioni_annuali,20,note_sui_mentori,text,pg_catalog,text,YES,null,NO,null
+public,partecipazioni_eventi,1,evento_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_eventi,2,partecipante_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_eventi,3,data_iscrizione,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,partecipazioni_eventi,4,presente,boolean,pg_catalog,bool,NO,false,NO,null
+public,partecipazioni_eventi,7,presente_impostato_da,uuid,pg_catalog,uuid,YES,null,NO,null
+public,partecipazioni_eventi,8,presente_impostato_at,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,partecipazioni_house_of_mentore,1,evento_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_house_of_mentore,2,partecipante_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_house_of_mentore,3,opzione_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,partecipazioni_house_of_mentore,4,data_iscrizione,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,partecipazioni_house_of_mentore,5,presente,boolean,pg_catalog,bool,YES,null,NO,null
+public,questionari,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,questionari,2,template_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,questionari,3,titolo,character varying,pg_catalog,varchar,NO,null,NO,null
+public,questionari,4,provider,USER-DEFINED,public,questionario_provider,NO,null,NO,null
+public,questionari,5,evento_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,questionari,6,mentoraggio_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,questionari,7,url_esterno,text,pg_catalog,text,YES,null,NO,null
+public,questionari,8,aperto,boolean,pg_catalog,bool,NO,true,NO,null
+public,questionari,9,data_apertura,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,questionari,10,data_chiusura,timestamp with time zone,pg_catalog,timestamptz,YES,null,NO,null
+public,questionari,11,created_by,uuid,pg_catalog,uuid,YES,null,NO,null
+public,questionari,12,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,questionari,13,pubblico_token,uuid,pg_catalog,uuid,YES,gen_random_uuid(),NO,null
+public,questionari,14,token_pubblico,uuid,pg_catalog,uuid,YES,gen_random_uuid(),NO,null
+public,questionari_compilazioni,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,questionari_compilazioni,2,questionario_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,questionari_compilazioni,3,user_id,uuid,pg_catalog,uuid,YES,null,NO,null
+public,questionari_compilazioni,4,inviato_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,questionari_domande,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,questionari_domande,2,template_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,questionari_domande,3,ordine,integer,pg_catalog,int4,NO,null,NO,null
+public,questionari_domande,4,testo,text,pg_catalog,text,NO,null,NO,null
+public,questionari_domande,5,tipo,USER-DEFINED,public,questionario_tipo_domanda,NO,null,NO,null
+public,questionari_domande,6,obbligatoria,boolean,pg_catalog,bool,NO,false,NO,null
+public,questionari_domande,7,opzioni,jsonb,pg_catalog,jsonb,YES,null,NO,null
+public,questionari_domande,8,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,questionari_risposte,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,questionari_risposte,2,compilazione_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,questionari_risposte,3,domanda_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,questionari_risposte,4,valore,jsonb,pg_catalog,jsonb,YES,null,NO,null
+public,questionari_template,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,questionari_template,2,titolo,character varying,pg_catalog,varchar,NO,null,NO,null
+public,questionari_template,3,descrizione,text,pg_catalog,text,YES,null,NO,null
+public,questionari_template,4,destinatario,USER-DEFINED,public,questionario_destinatario,NO,null,NO,null
+public,questionari_template,5,versione,smallint,pg_catalog,int2,NO,1,NO,null
+public,questionari_template,6,attivo,boolean,pg_catalog,bool,NO,true,NO,null
+public,questionari_template,7,created_by,uuid,pg_catalog,uuid,YES,null,NO,null
+public,questionari_template,8,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,questionari_template,9,updated_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,questionari_template,10,predefinito,boolean,pg_catalog,bool,NO,false,NO,null
+public,risorse_mentoring,1,id,uuid,pg_catalog,uuid,NO,gen_random_uuid(),NO,null
+public,risorse_mentoring,2,titolo,character varying,pg_catalog,varchar,NO,null,NO,null
+public,risorse_mentoring,3,descrizione,text,pg_catalog,text,YES,null,NO,null
+public,risorse_mentoring,4,categoria,character varying,pg_catalog,varchar,NO,null,NO,null
+public,risorse_mentoring,5,anno_accademico,character varying,pg_catalog,varchar,YES,null,NO,null
+public,risorse_mentoring,6,storage_path,text,pg_catalog,text,NO,null,NO,null
+public,risorse_mentoring,7,nome_file,text,pg_catalog,text,NO,null,NO,null
+public,risorse_mentoring,8,dimensione_bytes,bigint,pg_catalog,int8,YES,null,NO,null
+public,risorse_mentoring,9,ordine,integer,pg_catalog,int4,NO,100,NO,null
+public,risorse_mentoring,10,attivo,boolean,pg_catalog,bool,NO,true,NO,null
+public,risorse_mentoring,11,uploaded_by,uuid,pg_catalog,uuid,YES,null,NO,null
+public,risorse_mentoring,12,created_at,timestamp with time zone,pg_catalog,timestamptz,NO,now(),NO,null
+public,ssd,1,cod_ssd,character varying,pg_catalog,varchar,NO,null,NO,null
+public,ssd,2,gsd,character varying,pg_catalog,varchar,NO,null,NO,null
+public,ssd,3,area,character varying,pg_catalog,varchar,NO,null,NO,null
+public,user_roles,1,user_id,uuid,pg_catalog,uuid,NO,null,NO,null
+public,user_roles,2,role,USER-DEFINED,public,app_role,NO,'participant'::app_role,NO,null

@@ -1,43 +1,55 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../app_exception.dart';
-import '../../sessione_controller.dart';
-import '../../notifiche_automatiche_service.dart';
-import '../../supabase_config.dart';
+import '../../app/app_core.dart';
+import '../../app/app_session_controller.dart';
+import '../../dati/repository.dart';
+import '../../supporto/notifiche_automatiche_service.dart';
+import '../../ui/dinamico_schema.dart';
 
+/// Controller della pagina Eventi.
+///
+/// Coordina caricamento, selezione, iscrizioni, presenze, questionari privati
+/// associati agli eventi e gestione della locandina. Tutto l'accesso remoto
+/// passa attraverso [DatabaseRepository]; la pagina contiene solo la UI.
 class EventiController extends ChangeNotifier {
-  EventiController(this.sessione);
+  EventiController(
+    this.sessione, {
+    DatabaseRepository? database,
+  }) : db = database ?? DatabaseRepository();
 
   static const String bucketLocandine = 'locandine';
   static const int dimensioneMassimaLocandina = 300 * 1024;
 
   final SessioneController sessione;
+  final DatabaseRepository db;
 
   final List<Map<String, dynamic>> eventi = <Map<String, dynamic>>[];
   final List<String> anniAccademici = <String>[];
+  final List<Map<String, dynamic>> templateQuestionari =
+      <Map<String, dynamic>>[];
 
   final Map<String, Map<String, dynamic>> iscrizioni =
       <String, Map<String, dynamic>>{};
 
-  /// Iscritti visibili solo a owner/organizer, raggruppati per evento.
   final Map<String, List<Map<String, dynamic>>> iscrittiPerEvento =
       <String, List<Map<String, dynamic>>>{};
 
   final Map<String, Map<String, dynamic>> anagraficaPerUserId =
       <String, Map<String, dynamic>>{};
 
-  /// evento_id -> questionario_id per i questionari interni di gradimento.
   final Map<String, String> questionarioPerEvento = <String, String>{};
+  final Map<String, Map<String, dynamic>> questionariPrivatiPerEvento =
+      <String, Map<String, dynamic>>{};
 
-  /// "questionario_id|user_id" -> data invio.
   final Map<String, DateTime> compilazioni = <String, DateTime>{};
 
   bool caricamento = false;
+  bool salvataggio = false;
   String? errore;
   String? eventoSelezionatoId;
 
   bool get puoGestire => sessione.ruolo?.puoAmministrare ?? false;
+  bool get partecipante => sessione.ruolo == AppRole.participant;
 
   Map<String, dynamic>? get eventoSelezionato {
     for (final evento in eventi) {
@@ -45,6 +57,10 @@ class EventiController extends ChangeNotifier {
     }
     return eventi.isEmpty ? null : eventi.first;
   }
+
+  /// Carica lo schema DB e lo converte nel modello usato dalla UI dinamica.
+  Future<SchemaDatabase> caricaSchemaDatabase() =>
+      SchemaDatabase.carica(database: db);
 
   bool iscritto(String eventoId) => iscrizioni.containsKey(eventoId);
 
@@ -61,8 +77,7 @@ class EventiController extends ChangeNotifier {
     final questionarioId = questionarioPerEvento[eventoId];
     if (questionarioId == null) return false;
 
-    final userId =
-        partecipanteId ?? SupabaseConfig.client.auth.currentUser?.id;
+    final userId = partecipanteId ?? db.userIdCorrente;
     if (userId == null) return false;
 
     return compilazioni.containsKey('$questionarioId|$userId');
@@ -80,6 +95,18 @@ class EventiController extends ChangeNotifier {
   List<Map<String, dynamic>> iscritti(String eventoId) =>
       iscrittiPerEvento[eventoId] ?? const <Map<String, dynamic>>[];
 
+  List<Map<String, dynamic>> templatePer(String destinatario) =>
+      templateQuestionari
+          .where(
+            (riga) =>
+                riga['destinatario']?.toString() == destinatario &&
+                riga['attivo'] != false,
+          )
+          .toList(growable: false);
+
+  Map<String, dynamic>? questionarioEvento(String eventoId) =>
+      questionariPrivatiPerEvento[eventoId];
+
   String nomePartecipante(String userId) {
     final persona = anagraficaPerUserId[userId];
     if (persona == null) return userId;
@@ -91,99 +118,125 @@ class EventiController extends ChangeNotifier {
     return completo.isEmpty ? userId : completo;
   }
 
+  /// Carica tutti i dati necessari alla pagina.
   Future<void> carica() async {
     caricamento = true;
     errore = null;
     notifyListeners();
 
     try {
-      final userId = SupabaseConfig.client.auth.currentUser?.id;
+      final userId = db.userIdCorrente;
       if (userId == null) {
         throw const AppException('Sessione non valida.');
       }
 
-      final risultati = await Future.wait<dynamic>(<Future<dynamic>>[
-        _queryEventi(),
-        SupabaseConfig.client
-            .from('partecipazioni_eventi')
-            .select(
+      final risultati = await Future.wait<List<Map<String, dynamic>>>([
+        db.tabella('eventi').elenco(
+          colonne:
+              'id, titolo, anno_accademico, luogo, data_evento, tipologia, '
+              'descrizione, modalita, relatori, moderatori, '
+              'note_organizzative, locandina_url, '
+              'data_apertura_iscrizioni, data_chiusura_iscrizioni, '
+              'attiva, created_at',
+          filtri: <FiltroDb>[
+            if (!puoGestire) const FiltroDb.uguale('attiva', true),
+          ],
+          ordinamenti: const <OrdineDb>[
+            OrdineDb('data_evento', crescente: false),
+          ],
+        ),
+        db.tabella('partecipazioni_eventi').elenco(
+          colonne:
               'evento_id, partecipante_id, data_iscrizione, presente',
-            )
-            .eq('partecipante_id', userId),
-        SupabaseConfig.client
-            .from('anni_accademici')
-            .select('codice')
-            .order('codice', ascending: false),
-        SupabaseConfig.client
-            .from('questionari')
-            .select('id, evento_id')
-            .eq('provider', 'interno')
-            .eq('aperto', true),
-        SupabaseConfig.client
-            .from('questionari_compilazioni')
-            .select('questionario_id, user_id, inviato_at')
-            .eq('user_id', userId),
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('partecipante_id', userId),
+          ],
+        ),
+        db.tabella('anni_accademici').elenco(
+          colonne: 'codice',
+          ordinamenti: const <OrdineDb>[
+            OrdineDb('codice', crescente: false),
+          ],
+        ),
+        db.tabella('questionari').elenco(
+          colonne: 'id, evento_id, template_id, titolo, aperto',
+          filtri: const <FiltroDb>[
+            FiltroDb.uguale('provider', 'interno'),
+            FiltroDb.uguale('aperto', true),
+          ],
+        ),
+        db.tabella('questionari_compilazioni').elenco(
+          colonne: 'questionario_id, user_id, inviato_at',
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('user_id', userId),
+          ],
+        ),
+        db.tabella('questionari_template').elenco(
+          ordinamenti: const <OrdineDb>[
+            OrdineDb('destinatario'),
+            OrdineDb('titolo'),
+          ],
+        ),
       ]);
 
       eventi
         ..clear()
-        ..addAll((risultati[0] as List).cast<Map<String, dynamic>>());
+        ..addAll(risultati[0]);
 
       iscrizioni.clear();
-      for (final riga
-          in (risultati[1] as List).cast<Map<String, dynamic>>()) {
-        iscrizioni[riga['evento_id'].toString()] = riga;
+      for (final riga in risultati[1]) {
+        final eventoId = riga['evento_id']?.toString() ?? '';
+        if (eventoId.isNotEmpty) iscrizioni[eventoId] = riga;
       }
 
       anniAccademici
         ..clear()
         ..addAll(
-          (risultati[2] as List)
-              .cast<Map<String, dynamic>>()
-              .map((riga) => riga['codice'].toString()),
+          risultati[2]
+              .map((riga) => riga['codice']?.toString() ?? '')
+              .where((codice) => codice.isNotEmpty),
         );
 
       questionarioPerEvento.clear();
-      for (final riga
-          in (risultati[3] as List).cast<Map<String, dynamic>>()) {
-        final eventoId = riga['evento_id']?.toString();
-        final questionarioId = riga['id']?.toString();
+      questionariPrivatiPerEvento.clear();
+      for (final riga in risultati[3]) {
+        final eventoId = riga['evento_id']?.toString() ?? '';
+        final questionarioId = riga['id']?.toString() ?? '';
 
-        if (eventoId != null &&
-            eventoId.isNotEmpty &&
-            questionarioId != null &&
-            questionarioId.isNotEmpty) {
-          questionarioPerEvento[eventoId] = questionarioId;
-        }
+        if (eventoId.isEmpty || questionarioId.isEmpty) continue;
+
+        questionarioPerEvento[eventoId] = questionarioId;
+        questionariPrivatiPerEvento[eventoId] = riga;
       }
 
       compilazioni.clear();
-      _aggiungiCompilazioni(
-        (risultati[4] as List).cast<Map<String, dynamic>>(),
-      );
+      _aggiungiCompilazioni(risultati[4]);
+
+      templateQuestionari
+        ..clear()
+        ..addAll(risultati[5]);
 
       iscrittiPerEvento.clear();
       anagraficaPerUserId.clear();
 
       if (puoGestire) {
-        final risultatiGestione =
-            await Future.wait<dynamic>(<Future<dynamic>>[
-          SupabaseConfig.client
-              .from('partecipazioni_eventi')
-              .select(
+        final gestione = await Future.wait<List<Map<String, dynamic>>>([
+          db.tabella('partecipazioni_eventi').elenco(
+            colonne:
                 'evento_id, partecipante_id, data_iscrizione, presente',
-              )
-              .order('data_iscrizione', ascending: true),
-          SupabaseConfig.client
-              .from('anagrafica')
-              .select('user_id, nome, cognome'),
-          SupabaseConfig.client
-              .from('questionari_compilazioni')
-              .select('questionario_id, user_id, inviato_at'),
+            ordinamenti: const <OrdineDb>[
+              OrdineDb('data_iscrizione'),
+            ],
+          ),
+          db.tabella('anagrafica').elenco(
+            colonne: 'user_id, nome, cognome',
+          ),
+          db.tabella('questionari_compilazioni').elenco(
+            colonne: 'questionario_id, user_id, inviato_at',
+          ),
         ]);
 
-        for (final riga
-            in (risultatiGestione[0] as List).cast<Map<String, dynamic>>()) {
+        for (final riga in gestione[0]) {
           final eventoId = riga['evento_id']?.toString() ?? '';
           if (eventoId.isEmpty) continue;
 
@@ -195,21 +248,20 @@ class EventiController extends ChangeNotifier {
               .add(riga);
         }
 
-        for (final persona
-            in (risultatiGestione[1] as List).cast<Map<String, dynamic>>()) {
+        for (final persona in gestione[1]) {
           final id = persona['user_id']?.toString() ?? '';
-          if (id.isNotEmpty) {
-            anagraficaPerUserId[id] = persona;
-          }
+          if (id.isNotEmpty) anagraficaPerUserId[id] = persona;
         }
 
-        _aggiungiCompilazioni(
-          (risultatiGestione[2] as List).cast<Map<String, dynamic>>(),
-        );
+        _aggiungiCompilazioni(gestione[2]);
       }
 
-      if (eventoSelezionatoId == null && eventi.isNotEmpty) {
-        eventoSelezionatoId = eventi.first['id'].toString();
+      if (eventi.isEmpty) {
+        eventoSelezionatoId = null;
+      } else if (!eventi.any(
+        (evento) => evento['id']?.toString() == eventoSelezionatoId,
+      )) {
+        eventoSelezionatoId = eventi.first['id']?.toString();
       }
     } catch (e) {
       errore = AppErrorMapper.converti(
@@ -222,9 +274,7 @@ class EventiController extends ChangeNotifier {
     }
   }
 
-  void _aggiungiCompilazioni(
-    List<Map<String, dynamic>> righe,
-  ) {
+  void _aggiungiCompilazioni(List<Map<String, dynamic>> righe) {
     for (final riga in righe) {
       final questionarioId = riga['questionario_id']?.toString() ?? '';
       final userId = riga['user_id']?.toString() ?? '';
@@ -235,31 +285,12 @@ class EventiController extends ChangeNotifier {
         riga['inviato_at']?.toString() ?? '',
       );
 
-      compilazioni['$questionarioId|$userId'] =
-          data ?? DateTime.now();
+      compilazioni['$questionarioId|$userId'] = data ?? DateTime.now();
     }
-  }
-
-  Future<List<Map<String, dynamic>>> _queryEventi() async {
-    var query = SupabaseConfig.client.from('eventi').select(
-      'id, titolo, anno_accademico, luogo, data_evento, tipologia, '
-      'descrizione, modalita, relatori, moderatori, note_organizzative, '
-      'locandina_url, data_apertura_iscrizioni, data_chiusura_iscrizioni, '
-      'attiva, created_at',
-    );
-
-    if (!puoGestire) {
-      query = query.eq('attiva', true);
-    }
-
-    final righe =
-        await query.order('data_evento', ascending: false);
-
-    return righe.cast<Map<String, dynamic>>();
   }
 
   void seleziona(Map<String, dynamic> evento) {
-    eventoSelezionatoId = evento['id'].toString();
+    eventoSelezionatoId = evento['id']?.toString();
     notifyListeners();
   }
 
@@ -279,31 +310,35 @@ class EventiController extends ChangeNotifier {
         (chiusura == null || !data.isAfter(chiusura));
   }
 
-  Future<String?> cambiaIscrizione(
-    Map<String, dynamic> evento,
-  ) async {
+  Future<String?> cambiaIscrizione(Map<String, dynamic> evento) async {
     try {
-      final userId = SupabaseConfig.client.auth.currentUser?.id;
-
+      final userId = db.userIdCorrente;
       if (userId == null) {
         throw const AppException('Sessione non valida.');
       }
 
-      final eventoId = evento['id'].toString();
+      final eventoId = evento['id']?.toString() ?? '';
+      if (eventoId.isEmpty) {
+        throw const AppException('Evento non valido.');
+      }
+
+      final partecipazioni = db.tabella('partecipazioni_eventi');
 
       if (iscritto(eventoId)) {
-        await SupabaseConfig.client
-            .from('partecipazioni_eventi')
-            .delete()
-            .eq('evento_id', eventoId)
-            .eq('partecipante_id', userId);
+        await partecipazioni.elimina(
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('evento_id', eventoId),
+            FiltroDb.uguale('partecipante_id', userId),
+          ],
+        );
       } else {
-        await SupabaseConfig.client
-            .from('partecipazioni_eventi')
-            .insert({
-          'evento_id': eventoId,
-          'partecipante_id': userId,
-        });
+        await partecipazioni.inserisci(
+          <String, dynamic>{
+            'evento_id': eventoId,
+            'partecipante_id': userId,
+          },
+          colonne: 'evento_id',
+        );
       }
 
       await carica();
@@ -311,16 +346,11 @@ class EventiController extends ChangeNotifier {
     } catch (e) {
       return AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile aggiornare l’iscrizione.',
+        messaggioGenerico: 'Impossibile aggiornare l’iscrizione.',
       ).messaggio;
     }
   }
 
-  /// Solo owner/organizer possono impostare la presenza.
-  ///
-  /// Lo stato di compilazione del questionario NON viene modificato:
-  /// deriva automaticamente da questionari_compilazioni.
   Future<String?> aggiornaPresenza({
     required String eventoId,
     required String partecipanteId,
@@ -328,18 +358,17 @@ class EventiController extends ChangeNotifier {
   }) async {
     try {
       if (!puoGestire) {
-        throw const AppException(
-          'Operazione non autorizzata.',
-        );
+        throw const AppException('Operazione non autorizzata.');
       }
 
-      await SupabaseConfig.client
-          .from('partecipazioni_eventi')
-          .update(<String, dynamic>{
-            'presente': presente,
-          })
-          .eq('evento_id', eventoId)
-          .eq('partecipante_id', partecipanteId);
+      await db.tabella('partecipazioni_eventi').aggiorna(
+        <String, dynamic>{'presente': presente},
+        filtri: <FiltroDb>[
+          FiltroDb.uguale('evento_id', eventoId),
+          FiltroDb.uguale('partecipante_id', partecipanteId),
+        ],
+        colonne: 'evento_id',
+      );
 
       if (presente && haQuestionario(eventoId)) {
         final evento = eventi.cast<Map<String, dynamic>?>().firstWhere(
@@ -367,8 +396,116 @@ class EventiController extends ChangeNotifier {
     } catch (e) {
       return AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile aggiornare la presenza.',
+        messaggioGenerico: 'Impossibile aggiornare la presenza.',
+      ).messaggio;
+    }
+  }
+
+  /// Carica questionario e domande per il dialog di compilazione.
+  Future<Map<String, dynamic>?> caricaQuestionarioEvento(
+    String eventoId,
+  ) async {
+    final questionario = await db.tabella('questionari').singolo(
+      filtri: <FiltroDb>[
+        const FiltroDb.uguale('provider', 'interno'),
+        FiltroDb.uguale('evento_id', eventoId),
+        const FiltroDb.uguale('aperto', true),
+      ],
+    );
+
+    if (questionario == null) return null;
+
+    final templateId = questionario['template_id']?.toString() ?? '';
+    if (templateId.isEmpty) {
+      throw const AppException(
+        'Template del questionario non disponibile.',
+      );
+    }
+
+    final domande = await db.tabella('questionari_domande').elenco(
+      filtri: <FiltroDb>[
+        FiltroDb.uguale('template_id', templateId),
+      ],
+      ordinamenti: const <OrdineDb>[
+        OrdineDb('ordine'),
+      ],
+    );
+
+    return <String, dynamic>{
+      'questionario': questionario,
+      'domande': domande,
+    };
+  }
+
+  /// Registra la compilazione del questionario privato dell'evento.
+  Future<String?> inviaQuestionario({
+    required String questionarioId,
+    required Map<String, dynamic> risposte,
+  }) async {
+    try {
+      final userId = db.userIdCorrente;
+      if (userId == null) {
+        throw const AppException('Sessione non valida.');
+      }
+
+      final esistente =
+          await db.tabella('questionari_compilazioni').singolo(
+        colonne: 'id',
+        filtri: <FiltroDb>[
+          FiltroDb.uguale('questionario_id', questionarioId),
+          FiltroDb.uguale('user_id', userId),
+        ],
+      );
+
+      if (esistente != null) {
+        throw const AppException(
+          'Hai già compilato questo questionario.',
+        );
+      }
+
+      final compilazione =
+          await db.tabella('questionari_compilazioni').inserisci(
+        <String, dynamic>{
+          'questionario_id': questionarioId,
+          'user_id': userId,
+        },
+        colonne: 'id',
+      );
+
+      final compilazioneId = compilazione['id']?.toString() ?? '';
+      if (compilazioneId.isEmpty) {
+        throw const AppException(
+          'Identificativo della compilazione non disponibile.',
+        );
+      }
+
+      try {
+        await db.tabella('questionari_risposte').inserisciMolti(
+          <Map<String, dynamic>>[
+            for (final risposta in risposte.entries)
+              <String, dynamic>{
+                'compilazione_id': compilazioneId,
+                'domanda_id': risposta.key,
+                'valore': risposta.value,
+              },
+          ],
+          colonne: 'id',
+        );
+      } catch (_) {
+        await db.tabella('questionari_compilazioni').elimina(
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('id', compilazioneId),
+          ],
+        );
+        rethrow;
+      }
+
+      await carica();
+      return null;
+    } catch (e) {
+      return AppErrorMapper.converti(
+        e,
+        messaggioGenerico: 'Impossibile inviare il questionario.',
       ).messaggio;
     }
   }
@@ -384,25 +521,22 @@ class EventiController extends ChangeNotifier {
   }) async {
     String? eventoCreatoId;
 
+    salvataggio = true;
+    notifyListeners();
+
     try {
       if (!puoGestire) {
-        throw const AppException(
-          'Operazione non autorizzata.',
-        );
+        throw const AppException('Operazione non autorizzata.');
       }
 
-      final anno =
-          dati['anno_accademico']?.toString().trim() ?? '';
-
+      final anno = dati['anno_accademico']?.toString().trim() ?? '';
       if (anno.isEmpty) {
         throw const AppException(
           'Devi selezionare l’anno accademico.',
         );
       }
 
-      final titolo =
-          dati['titolo']?.toString().trim() ?? '';
-
+      final titolo = dati['titolo']?.toString().trim() ?? '';
       if (titolo.isEmpty) {
         throw const AppException(
           'Il titolo dell’evento è obbligatorio.',
@@ -416,48 +550,57 @@ class EventiController extends ChangeNotifier {
         );
       }
 
+      final tabellaEventi = db.tabella('eventi');
+
       String? locandinaPrecedente;
       if (id != null && (locandinaBytes != null || rimuoviLocandina)) {
-        final eventoEsistente = await SupabaseConfig.client
-            .from('eventi')
-            .select('locandina_url')
-            .eq('id', id)
-            .maybeSingle();
-
+        final eventoEsistente = await tabellaEventi.singolo(
+          colonne: 'locandina_url',
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('id', id),
+          ],
+        );
         locandinaPrecedente =
             eventoEsistente?['locandina_url']?.toString();
       }
 
-      String eventoId;
+      late final String eventoId;
 
       if (id == null) {
-        final creato = await SupabaseConfig.client
-            .from('eventi')
-            .insert(<String, dynamic>{
-              ...dati,
-              'attiva': dati['attiva'] ?? true,
-            })
-            .select('id')
-            .single();
-
-        eventoId = creato['id'].toString();
+        final creato = await tabellaEventi.inserisci(
+          <String, dynamic>{
+            ...dati,
+            'attiva': dati['attiva'] ?? true,
+          },
+          colonne: 'id',
+        );
+        eventoId = creato['id']?.toString() ?? '';
+        if (eventoId.isEmpty) {
+          throw const AppException(
+            'Identificativo dell’evento non disponibile.',
+          );
+        }
         eventoCreatoId = eventoId;
       } else {
         eventoId = id;
-
-        await SupabaseConfig.client
-            .from('eventi')
-            .update(dati)
-            .eq('id', id);
+        await tabellaEventi.aggiorna(
+          dati,
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('id', id),
+          ],
+          colonne: 'id',
+        );
       }
 
       if (rimuoviLocandina) {
         await _rimuoviLocandinaStorage(locandinaPrecedente);
-
-        await SupabaseConfig.client
-            .from('eventi')
-            .update({'locandina_url': null})
-            .eq('id', eventoId);
+        await tabellaEventi.aggiorna(
+          <String, dynamic>{'locandina_url': null},
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('id', eventoId),
+          ],
+          colonne: 'id',
+        );
       } else if (locandinaBytes != null && locandinaNomeFile != null) {
         final nuovaUrl = await _caricaLocandina(
           eventoId: eventoId,
@@ -466,76 +609,21 @@ class EventiController extends ChangeNotifier {
           urlPrecedente: locandinaPrecedente,
         );
 
-        await SupabaseConfig.client
-            .from('eventi')
-            .update({'locandina_url': nuovaUrl})
-            .eq('id', eventoId);
+        await tabellaEventi.aggiorna(
+          <String, dynamic>{'locandina_url': nuovaUrl},
+          filtri: <FiltroDb>[
+            FiltroDb.uguale('id', eventoId),
+          ],
+          colonne: 'id',
+        );
       }
 
       if (aggiornaQuestionario) {
-        final esistente = await SupabaseConfig.client
-            .from('questionari')
-            .select('id, template_id')
-            .eq('provider', 'interno')
-            .eq('evento_id', eventoId)
-            .maybeSingle();
-
-        if (esistente == null && templateQuestionarioId != null) {
-          await SupabaseConfig.client.from('questionari').insert({
-            'template_id': templateQuestionarioId,
-            'titolo': 'Gradimento - $titolo',
-            'provider': 'interno',
-            'evento_id': eventoId,
-            'aperto': true,
-            'created_by': SupabaseConfig.client.auth.currentUser?.id,
-          });
-        } else if (esistente != null) {
-          final questionarioId = esistente['id'].toString();
-          final templateCorrente =
-              esistente['template_id']?.toString();
-
-          final compilazioni = await SupabaseConfig.client
-              .from('questionari_compilazioni')
-              .select('id')
-              .eq('questionario_id', questionarioId)
-              .limit(1);
-
-          final haCompilazioni = (compilazioni as List).isNotEmpty;
-
-          if (templateQuestionarioId == null) {
-            if (haCompilazioni) {
-              throw const AppException(
-                'Il questionario non può essere rimosso perché esistono già compilazioni.',
-              );
-            }
-
-            await SupabaseConfig.client
-                .from('questionari')
-                .delete()
-                .eq('id', questionarioId);
-          } else if (templateCorrente != templateQuestionarioId) {
-            if (haCompilazioni) {
-              throw const AppException(
-                'Il template non può essere cambiato perché esistono già compilazioni.',
-              );
-            }
-
-            await SupabaseConfig.client
-                .from('questionari')
-                .update({
-                  'template_id': templateQuestionarioId,
-                  'titolo': 'Gradimento - $titolo',
-                })
-                .eq('id', questionarioId);
-          } else {
-            await SupabaseConfig.client
-                .from('questionari')
-                .update({
-                  'titolo': 'Gradimento - $titolo',
-                })
-                .eq('id', questionarioId);
-          }
-        }
+        await _aggiornaQuestionarioEvento(
+          eventoId: eventoId,
+          titoloEvento: titolo,
+          templateQuestionarioId: templateQuestionarioId,
+        );
       }
 
       if (id == null) {
@@ -543,7 +631,8 @@ class EventiController extends ChangeNotifier {
           await NotificheAutomaticheService.inviaAnnoAccademico(
             annoAccademico: anno,
             titolo: 'Nuovo evento',
-            messaggio: 'È stato pubblicato l’evento "$titolo". '
+            messaggio:
+                'È stato pubblicato l’evento "$titolo". '
                 'Apri la pagina Eventi per consultare i dettagli e iscriverti.',
           );
         } catch (e) {
@@ -554,66 +643,133 @@ class EventiController extends ChangeNotifier {
       await carica();
       return null;
     } catch (e) {
-      // Se fallisce la creazione del questionario dopo aver creato un nuovo
-      // evento, proviamo a rimuovere il nuovo evento per non lasciare dati
-      // parziali.
       if (eventoCreatoId != null) {
         try {
-          await SupabaseConfig.client
-              .from('eventi')
-              .delete()
-              .eq('id', eventoCreatoId);
+          await db.tabella('eventi').elimina(
+            filtri: <FiltroDb>[
+              FiltroDb.uguale('id', eventoCreatoId),
+            ],
+          );
         } catch (_) {
-          // best effort
+          // Pulizia best effort.
         }
       }
 
       return AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile salvare l’evento.',
+        messaggioGenerico: 'Impossibile salvare l’evento.',
       ).messaggio;
+    } finally {
+      salvataggio = false;
+      notifyListeners();
     }
+  }
+
+  Future<void> _aggiornaQuestionarioEvento({
+    required String eventoId,
+    required String titoloEvento,
+    required String? templateQuestionarioId,
+  }) async {
+    final questionari = db.tabella('questionari');
+
+    final esistente = await questionari.singolo(
+      colonne: 'id, template_id',
+      filtri: <FiltroDb>[
+        const FiltroDb.uguale('provider', 'interno'),
+        FiltroDb.uguale('evento_id', eventoId),
+      ],
+    );
+
+    if (esistente == null) {
+      if (templateQuestionarioId == null) return;
+
+      await questionari.inserisci(
+        <String, dynamic>{
+          'template_id': templateQuestionarioId,
+          'titolo': 'Gradimento - $titoloEvento',
+          'provider': 'interno',
+          'evento_id': eventoId,
+          'aperto': true,
+          'created_by': db.userIdCorrente,
+        },
+        colonne: 'id',
+      );
+      return;
+    }
+
+    final questionarioId = esistente['id']?.toString() ?? '';
+    if (questionarioId.isEmpty) return;
+
+    final compilazioni =
+        await db.tabella('questionari_compilazioni').elenco(
+      colonne: 'id',
+      filtri: <FiltroDb>[
+        FiltroDb.uguale('questionario_id', questionarioId),
+      ],
+      limite: 1,
+    );
+    final haCompilazioni = compilazioni.isNotEmpty;
+
+    if (templateQuestionarioId == null) {
+      if (haCompilazioni) {
+        throw const AppException(
+          'Il questionario non può essere rimosso perché esistono già compilazioni.',
+        );
+      }
+
+      await questionari.elimina(
+        filtri: <FiltroDb>[
+          FiltroDb.uguale('id', questionarioId),
+        ],
+      );
+      return;
+    }
+
+    final templateCorrente = esistente['template_id']?.toString();
+    if (templateCorrente != templateQuestionarioId && haCompilazioni) {
+      throw const AppException(
+        'Il template non può essere cambiato perché esistono già compilazioni.',
+      );
+    }
+
+    await questionari.aggiorna(
+      <String, dynamic>{
+        'template_id': templateQuestionarioId,
+        'titolo': 'Gradimento - $titoloEvento',
+      },
+      filtri: <FiltroDb>[
+        FiltroDb.uguale('id', questionarioId),
+      ],
+      colonne: 'id',
+    );
   }
 
   Future<String?> elimina(String id) async {
     try {
       if (!puoGestire) {
-        throw const AppException(
-          'Operazione non autorizzata.',
-        );
+        throw const AppException('Operazione non autorizzata.');
       }
 
-      final prima = await SupabaseConfig.client
-          .from('eventi')
-          .select('id, locandina_url')
-          .eq('id', id)
-          .maybeSingle();
+      final tabellaEventi = db.tabella('eventi');
+      final prima = await tabellaEventi.singolo(
+        colonne: 'id, locandina_url',
+        filtri: <FiltroDb>[
+          FiltroDb.uguale('id', id),
+        ],
+      );
 
       if (prima == null) {
-        throw const AppException(
-          'Evento non trovato.',
-        );
+        throw const AppException('Evento non trovato.');
       }
 
-      final locandinaUrl =
-          prima['locandina_url']?.toString();
+      final locandinaUrl = prima['locandina_url']?.toString();
 
-      final eliminato = await SupabaseConfig.client
-          .from('eventi')
-          .delete()
-          .eq('id', id)
-          .select('id')
-          .maybeSingle();
+      await tabellaEventi.elimina(
+        filtri: <FiltroDb>[
+          FiltroDb.uguale('id', id),
+        ],
+      );
 
-      if (eliminato == null) {
-        throw const AppException(
-          'L’evento non è stato eliminato. Verifica i permessi RLS di cancellazione sulla tabella eventi.',
-        );
-      }
-
-      // Il file Storage non è una FK PostgreSQL: lo rimuoviamo separatamente.
-      // Se la pulizia Storage fallisce, l'evento resta comunque eliminato.
       try {
         await _rimuoviLocandinaStorage(locandinaUrl);
       } catch (e) {
@@ -622,13 +778,11 @@ class EventiController extends ChangeNotifier {
 
       eventoSelezionatoId = null;
       await carica();
-
       return null;
     } catch (e) {
       return AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile eliminare l’evento.',
+        messaggioGenerico: 'Impossibile eliminare l’evento.',
       ).messaggio;
     }
   }
@@ -645,8 +799,9 @@ class EventiController extends ChangeNotifier {
       );
     }
 
+    final parti = nomeFile.split('.');
     final estensione =
-        nomeFile.split('.').last.trim().toLowerCase();
+        parti.length > 1 ? parti.last.trim().toLowerCase() : '';
 
     if (!<String>{'jpg', 'jpeg', 'png'}.contains(estensione)) {
       throw const AppException(
@@ -654,72 +809,51 @@ class EventiController extends ChangeNotifier {
       );
     }
 
-    final mimeType = estensione == 'png'
-        ? 'image/png'
-        : 'image/jpeg';
-
+    final mimeType = estensione == 'png' ? 'image/png' : 'image/jpeg';
     final estensioneNormalizzata =
         estensione == 'jpeg' ? 'jpg' : estensione;
-
-    final path =
+    final percorso =
         'eventi/$eventoId/locandina.$estensioneNormalizzata';
 
-    final vecchioPath =
-        _storagePathDaUrl(urlPrecedente);
-
-    if (vecchioPath != null && vecchioPath != path) {
+    final vecchioPath = _storagePathDaUrl(urlPrecedente);
+    if (vecchioPath != null && vecchioPath != percorso) {
       try {
-        await SupabaseConfig.client.storage
-            .from(bucketLocandine)
-            .remove([vecchioPath]);
+        await db.rimuoviFileStorage(
+          bucket: bucketLocandine,
+          percorsi: <String>[vecchioPath],
+        );
       } catch (_) {
-        // Non blocchiamo la sostituzione se il vecchio file non esiste più.
+        // Non blocca la sostituzione se il file precedente non esiste.
       }
     }
 
-    await SupabaseConfig.client.storage
-        .from(bucketLocandine)
-        .uploadBinary(
-          path,
-          bytes,
-          fileOptions: FileOptions(
-            cacheControl: '3600',
-            upsert: true,
-            contentType: mimeType,
-          ),
-        );
-
-    return SupabaseConfig.client.storage
-        .from(bucketLocandine)
-        .getPublicUrl(path);
+    return db.caricaFilePubblico(
+      bucket: bucketLocandine,
+      percorso: percorso,
+      bytes: bytes,
+      contentType: mimeType,
+    );
   }
 
-  Future<void> _rimuoviLocandinaStorage(
-    String? url,
-  ) async {
-    final path = _storagePathDaUrl(url);
-    if (path == null) return;
+  Future<void> _rimuoviLocandinaStorage(String? url) async {
+    final percorso = _storagePathDaUrl(url);
+    if (percorso == null) return;
 
-    await SupabaseConfig.client.storage
-        .from(bucketLocandine)
-        .remove([path]);
+    await db.rimuoviFileStorage(
+      bucket: bucketLocandine,
+      percorsi: <String>[percorso],
+    );
   }
 
   String? _storagePathDaUrl(String? url) {
     if (url == null || url.trim().isEmpty) return null;
 
-    final marker =
-        '/storage/v1/object/public/$bucketLocandine/';
+    final marker = '/storage/v1/object/public/$bucketLocandine/';
     final indice = url.indexOf(marker);
 
-    if (indice < 0) {
-      // URL esterno/legacy (ad es. Google Drive): non è un oggetto
-      // del bucket locandine e quindi non va rimosso da Storage.
-      return null;
-    }
+    if (indice < 0) return null;
 
-    final path = url.substring(indice + marker.length);
-    return Uri.decodeComponent(path);
+    final percorso = url.substring(indice + marker.length);
+    return Uri.decodeComponent(percorso);
   }
-
 }

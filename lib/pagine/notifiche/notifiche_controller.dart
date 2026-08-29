@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../app/app_core.dart';
+import '../../dati/repository.dart';
+import '../../supporto/notifiche_push_service.dart';
 
-import '../../app_exception.dart';
-import '../../supabase_config.dart';
-
+/// Notifica ricevuta dall'utente corrente, pronta per la visualizzazione.
 class NotificaRicevuta {
   const NotificaRicevuta({
     required this.destinatarioId,
@@ -34,11 +34,16 @@ class NotificaRicevuta {
   bool get letta => stato == 'letto' || lettaAt != null;
 }
 
+/// Controller della pagina personale Notifiche.
+///
+/// Mantiene stato e composizione dei messaggi ricevuti. Le operazioni remote
+/// restano volutamente delegate a [NotificheRepository], che costituisce il
+/// sottosistema notifiche separato dal repository CRUD generico.
 class NotificheController extends ChangeNotifier {
-  NotificheController({SupabaseClient? client, this.limite = 20})
-      : _client = client ?? SupabaseConfig.client;
+  NotificheController({NotificheRepository? repository, this.limite = 20})
+      : repository = repository ?? NotificheRepository();
 
-  final SupabaseClient _client;
+  final NotificheRepository repository;
   final int limite;
 
   List<NotificaRicevuta> _notifiche = const <NotificaRicevuta>[];
@@ -50,8 +55,9 @@ class NotificheController extends ChangeNotifier {
   String? get errore => _errore;
   int get nonLette => _notifiche.where((n) => !n.letta).length;
 
+  /// Carica i dati necessari e aggiorna lo stato esposto alla pagina.
   Future<void> carica() async {
-    final userId = _client.auth.currentUser?.id;
+    final userId = repository.userIdCorrente;
     if (userId == null) {
       _notifiche = const <NotificaRicevuta>[];
       _errore = 'Utente non autenticato.';
@@ -64,13 +70,7 @@ class NotificheController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final destinatariRaw = await _client
-          .from('notifiche_destinatari')
-          .select('id, messaggio_id, stato, inviato_at, letto_at, created_at')
-          .eq('user_id', userId)
-          .inFilter('stato', const <String>['inviato', 'letto'])
-          .order('created_at', ascending: false)
-          .limit(limite);
+      final destinatariRaw = await repository.notificheRicevute(limite: limite);
 
       final destinatari = (destinatariRaw as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
@@ -84,14 +84,8 @@ class NotificheController extends ChangeNotifier {
 
       final messaggiPerId = <String, Map<String, dynamic>>{};
       if (ids.isNotEmpty) {
-        final messaggiRaw = await _client
-            .from('notifiche_messaggi')
-            .select(
-              'id, titolo, messaggio, anno_accademico, origine_tabella, '
-              'origine_id, inviata_at, created_at',
-            )
-            .inFilter('id', ids);
-        for (final raw in messaggiRaw as List) {
+        final messaggiRaw = await repository.messaggiPerIds(ids);
+        for (final raw in messaggiRaw) {
           final m = Map<String, dynamic>.from(raw as Map);
           final id = m['id']?.toString();
           if (id != null) messaggiPerId[id] = m;
@@ -132,19 +126,18 @@ class NotificheController extends ChangeNotifier {
     } finally {
       _caricamento = false;
       notifyListeners();
+      await NotifichePushService.instance.aggiornaNonLette();
     }
   }
 
+  /// Aggiorna l’operazione `segnaComeLetta` mantenendo separata la logica dalla UI.
   Future<String?> segnaComeLetta(NotificaRicevuta notifica) async {
     if (notifica.letta) return null;
-    final userId = _client.auth.currentUser?.id;
+    final userId = repository.userIdCorrente;
     if (userId == null) return 'Utente non autenticato.';
 
     try {
-      await _client.rpc(
-        'notifiche_segna_letta',
-        params: <String, dynamic>{'p_destinatario_id': notifica.destinatarioId},
-      );
+      await repository.segnaDestinatarioLetto(notifica.destinatarioId);
       await carica();
       return null;
     } catch (errore) {
@@ -155,6 +148,7 @@ class NotificheController extends ChangeNotifier {
     }
   }
 
+  /// Gestisce l’operazione interna “data” della pagina.
   static DateTime? _data(Object? value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString())?.toLocal();

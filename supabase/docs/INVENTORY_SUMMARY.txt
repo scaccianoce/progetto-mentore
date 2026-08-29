@@ -1,0 +1,21 @@
+INVENTARIO STRUTTURALE ACQUISITO
+================================
+Tabelle public: 28
+Colonne (incluse colonne view nell'export originario): 275
+Enum: 20
+Valori enum: 93
+Constraint: 97
+Indici: 82
+Views: 1
+Functions PostgreSQL: 77
+Trigger applicativi: 13
+Tabelle con RLS inventariate: 28
+Policies public/storage: 125
+Grant tabella inventariati: 417
+Grant funzione inventariati: 99
+Extensions: 7
+Storage buckets: 3
+Cron jobs: 1
+
+Questo pacchetto deriva esclusivamente da query read-only eseguite sul progetto
+sorgente. La generazione dei file NON ha modificato il database.

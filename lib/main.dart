@@ -1,11 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-import 'app.dart';
-import 'app_exception.dart';
-import 'firebase_options.dart';
-import 'notifiche_push_service.dart';
-import 'supabase_config.dart';
+import 'app/app.dart';
+import 'app/app_core.dart';
+import 'configurazione/firebase_options.dart';
+import 'dati/repository.dart';
+import 'supporto/notifiche_push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,12 +13,17 @@ Future<void> main() async {
   String? erroreAvvio;
 
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-
+    // Supabase e' il servizio necessario al funzionamento dell'applicazione.
     await SupabaseConfig.inizializza();
-    await NotifichePushService.instance.inizializza();
+
+    // Firebase e le push sono opzionali sulle piattaforme non ancora
+    // configurate (ad esempio macOS). L'app continua a funzionare senza push.
+    if (DefaultFirebaseOptions.supportaPiattaformaCorrente) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      await NotifichePushService.instance.inizializza();
+    }
   } on StateError catch (errore) {
     erroreAvvio = errore.message.toString();
   } catch (errore) {

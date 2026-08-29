@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:prog_mentore/dinamico/maschera_dinamica_controller.dart';
+import 'package:prog_mentore/ui/dinamico_schema.dart';
 
 void main() {
   test('interpreta tipi, enum, relazioni e direttive UI', () {

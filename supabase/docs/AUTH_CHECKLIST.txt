@@ -1,0 +1,18 @@
+AUTHENTICATION - COSA RICREARE
+=================================
+
+Per un nuovo progetto SENZA DATI:
+- NON ricreare manualmente auth.users, auth.identities e le altre tabelle
+  standard: Supabase le crea automaticamente.
+- NON copiare utenti, password hashate o sessioni se vuoi un ambiente vuoto.
+
+Da verificare manualmente nel Dashboard del progetto sorgente:
+- provider abilitati (email/password, OAuth, ecc.);
+- Site URL;
+- Redirect URLs;
+- eventuali template email personalizzati;
+- eventuali impostazioni SMTP;
+- eventuali CAPTCHA / MFA / hook Auth.
+
+Le FK applicative verso auth.users sono invece già catturate in
+04_constraints.sql.

@@ -1,0 +1,172 @@
+schemaname,tablename,policyname,permissive,roles,cmd,qual,with_check
+public,abilitazioni_modifica,Owner and organizer update authorizations,PERMISSIVE,{authenticated},UPDATE,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,abilitazioni_modifica,Users read own authorizations,PERMISSIVE,{authenticated},SELECT,"((user_id = ( SELECT auth.uid() AS uid)) OR has_role(ARRAY['owner'::app_role, 'organizer'::app_role]))",null
+public,abilitazioni_modifica,abilitazioni_modifica_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,anagrafica,Owner and organizer create anagrafica,PERMISSIVE,{authenticated},INSERT,null,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,anagrafica,Owner and organizer update all anagrafica,PERMISSIVE,{authenticated},UPDATE,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,anagrafica,Read active anagrafica or manage all,PERMISSIVE,{authenticated},SELECT,"(anagrafica_e_attiva(user_id) OR has_role(ARRAY['owner'::app_role, 'organizer'::app_role]))",null
+public,anagrafica,Users update own profile when authorized,PERMISSIVE,{authenticated},UPDATE,((user_id = ( SELECT auth.uid() AS uid)) AND puo_modificare_corrente('anagrafica'::ambito_modifica)),((user_id = ( SELECT auth.uid() AS uid)) AND puo_modificare_corrente('anagrafica'::ambito_modifica))
+public,anagrafica,anagrafica_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,app_backoffice_admin()
+public,anagrafica,anagrafica_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,anagrafica,anagrafica_backoffice_update,PERMISSIVE,{authenticated},UPDATE,app_backoffice_admin(),app_backoffice_admin()
+public,anagrafica_riservata,Owner and organizer insert reserved data,PERMISSIVE,{authenticated},INSERT,null,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,anagrafica_riservata,Owner and organizer read reserved data,PERMISSIVE,{authenticated},SELECT,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])",null
+public,anagrafica_riservata,Owner and organizer update reserved data,PERMISSIVE,{authenticated},UPDATE,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,anagrafica_riservata,anagrafica_riservata_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,app_backoffice_admin()
+public,anagrafica_riservata,anagrafica_riservata_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,anagrafica_riservata,anagrafica_riservata_backoffice_update,PERMISSIVE,{authenticated},UPDATE,app_backoffice_admin(),app_backoffice_admin()
+public,anni_accademici,Authenticated users read academic years,PERMISSIVE,{authenticated},SELECT,true,null
+public,anni_accademici,Owner manages academic years,PERMISSIVE,{authenticated},ALL,has_role(ARRAY['owner'::app_role]),has_role(ARRAY['owner'::app_role])
+public,anni_accademici,authenticated can read anni_accademici,PERMISSIVE,{authenticated},SELECT,true,null
+public,eventi,Authenticated users read events,PERMISSIVE,{authenticated},SELECT,true,null
+public,eventi,Owner and organizer manage events,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,eventi,eventi_backoffice_delete,PERMISSIVE,{authenticated},DELETE,app_backoffice_admin(),null
+public,house_of_mentore,Authenticated users read House of Mentore,PERMISSIVE,{authenticated},SELECT,true,null
+public,house_of_mentore,Owner and organizer manage House of Mentore,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,house_of_mentore_opzioni,Authenticated users read House options,PERMISSIVE,{authenticated},SELECT,true,null
+public,house_of_mentore_opzioni,Owner and organizer manage House options,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,insegnamenti,Assigned mentors read teaching,PERMISSIVE,{authenticated},SELECT,is_mentore_di_insegnamento(id),null
+public,insegnamenti,Owner and organizer manage teachings,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,insegnamenti,Users create own teaching,PERMISSIVE,{authenticated},INSERT,null,(docente_id = auth.uid())
+public,insegnamenti,Users read own teaching,PERMISSIVE,{authenticated},SELECT,"((docente_id = ( SELECT auth.uid() AS uid)) OR has_role(ARRAY['owner'::app_role, 'organizer'::app_role]))",null
+public,insegnamenti,Users update own teaching,PERMISSIVE,{authenticated},UPDATE,(docente_id = auth.uid()),(docente_id = auth.uid())
+public,insegnamenti,insegnamenti_backoffice_delete,PERMISSIVE,{authenticated},DELETE,app_backoffice_admin(),null
+public,insegnamenti,insegnamenti_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,app_backoffice_admin()
+public,insegnamenti,insegnamenti_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,insegnamenti,insegnamenti_backoffice_update,PERMISSIVE,{authenticated},UPDATE,app_backoffice_admin(),app_backoffice_admin()
+public,mentoraggi,mentoraggi_backoffice_delete,PERMISSIVE,{authenticated},DELETE,app_backoffice_admin(),null
+public,mentoraggi,mentoraggi_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,app_backoffice_admin()
+public,mentoraggi,mentoraggi_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,mentoraggi,mentoraggi_backoffice_update,PERMISSIVE,{authenticated},UPDATE,app_backoffice_admin(),app_backoffice_admin()
+public,mentoraggi,mentoraggi_delete_backoffice,PERMISSIVE,{authenticated},DELETE,mentoraggio_backoffice(),null
+public,mentoraggi,mentoraggi_insert_backoffice,PERMISSIVE,{authenticated},INSERT,null,mentoraggio_backoffice()
+public,mentoraggi,mentoraggi_select_team_backoffice,PERMISSIVE,{authenticated},SELECT,"(mentoraggio_backoffice() OR mentoraggio_utente_associato(id, auth.uid()))",null
+public,mentoraggi,mentoraggi_update_autorizzati,PERMISSIVE,{authenticated},UPDATE,"(mentoraggio_backoffice() OR mentoraggio_utente_associato(id, auth.uid()) OR mentoraggio_utente_mentee(id, auth.uid()))","(mentoraggio_backoffice() OR mentoraggio_utente_associato(id, auth.uid()) OR mentoraggio_utente_mentee(id, auth.uid()))"
+public,mentoraggio_mentori,Mentee and assigned mentors read assignments,PERMISSIVE,{authenticated},SELECT,(is_docente_del_mentoraggio(mentoraggio_id) OR is_mentore_assegnato(mentoraggio_id)),null
+public,mentoraggio_mentori,Owner and organizer manage mentor assignments,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,mentoraggio_mentori,mentoraggio_mentori_backoffice_delete,PERMISSIVE,{authenticated},DELETE,app_backoffice_admin(),null
+public,mentoraggio_mentori,mentoraggio_mentori_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,app_backoffice_admin()
+public,mentoraggio_mentori,mentoraggio_mentori_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,mentoraggio_mentori,mentoraggio_mentori_backoffice_update,PERMISSIVE,{authenticated},UPDATE,app_backoffice_admin(),app_backoffice_admin()
+public,news,Only owners can delete news,PERMISSIVE,{authenticated},DELETE,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])",null
+public,news,Owners and organizers can create news,PERMISSIVE,{authenticated},INSERT,null,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,news,Owners and organizers can update news,PERMISSIVE,{authenticated},UPDATE,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,news,Read active news or manage all,PERMISSIVE,{authenticated},SELECT,"((COALESCE(attiva, false) = true) OR has_role(ARRAY['owner'::app_role, 'organizer'::app_role]))",null
+public,notifiche_destinatari,notifiche_destinatari_admin_tutto,PERMISSIVE,{authenticated},ALL,notifiche_utente_amministratore(),notifiche_utente_amministratore()
+public,notifiche_destinatari,notifiche_destinatari_backoffice_delete,PERMISSIVE,{authenticated},DELETE,notifiche_amministratore(),null
+public,notifiche_destinatari,notifiche_destinatari_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,notifiche_amministratore()
+public,notifiche_destinatari,notifiche_destinatari_backoffice_select,PERMISSIVE,{authenticated},SELECT,notifiche_amministratore(),null
+public,notifiche_destinatari,notifiche_destinatari_backoffice_update,PERMISSIVE,{authenticated},UPDATE,notifiche_amministratore(),notifiche_amministratore()
+public,notifiche_destinatari,notifiche_destinatari_leggi_propri,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+public,notifiche_dispositivi,notifiche_dispositivi_admin_leggi,PERMISSIVE,{authenticated},SELECT,notifiche_utente_amministratore(),null
+public,notifiche_dispositivi,notifiche_dispositivi_backoffice_select,PERMISSIVE,{authenticated},SELECT,notifiche_amministratore(),null
+public,notifiche_dispositivi,notifiche_dispositivi_leggi_propri,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+public,notifiche_dispositivi,notifiche_dispositivi_propri,PERMISSIVE,{authenticated},ALL,(user_id = auth.uid()),(user_id = auth.uid())
+public,notifiche_messaggi,notifiche_messaggi_admin_tutto,PERMISSIVE,{authenticated},ALL,notifiche_utente_amministratore(),notifiche_utente_amministratore()
+public,notifiche_messaggi,notifiche_messaggi_backoffice_delete,PERMISSIVE,{authenticated},DELETE,notifiche_amministratore(),null
+public,notifiche_messaggi,notifiche_messaggi_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,notifiche_amministratore()
+public,notifiche_messaggi,notifiche_messaggi_backoffice_select,PERMISSIVE,{authenticated},SELECT,notifiche_amministratore(),null
+public,notifiche_messaggi,notifiche_messaggi_backoffice_update,PERMISSIVE,{authenticated},UPDATE,notifiche_amministratore(),notifiche_amministratore()
+public,notifiche_messaggi,notifiche_messaggi_leggi_se_destinatario,PERMISSIVE,{authenticated},SELECT,"(EXISTS ( SELECT 1
+   FROM notifiche_destinatari nd
+  WHERE ((nd.messaggio_id = notifiche_messaggi.id) AND (nd.user_id = auth.uid()))))",null
+public,notifiche_regole,notifiche_regole_admin_tutto,PERMISSIVE,{authenticated},ALL,notifiche_utente_amministratore(),notifiche_utente_amministratore()
+public,notifiche_regole,notifiche_regole_backoffice_delete,PERMISSIVE,{authenticated},DELETE,notifiche_amministratore(),null
+public,notifiche_regole,notifiche_regole_backoffice_insert,PERMISSIVE,{authenticated},INSERT,null,notifiche_amministratore()
+public,notifiche_regole,notifiche_regole_backoffice_select,PERMISSIVE,{authenticated},SELECT,notifiche_amministratore(),null
+public,notifiche_regole,notifiche_regole_backoffice_update,PERMISSIVE,{authenticated},UPDATE,notifiche_amministratore(),notifiche_amministratore()
+public,partecipazioni_annuali,partecipazioni_annuali_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,partecipazioni_annuali,partecipazioni_annuali_own_select,PERMISSIVE,{authenticated},SELECT,(user_id = auth.uid()),null
+public,partecipazioni_eventi,Owner and organizer manage event registrations,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,partecipazioni_eventi,Participants cancel own registrations,PERMISSIVE,{authenticated},DELETE,"((partecipante_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM eventi e
+  WHERE ((e.id = partecipazioni_eventi.evento_id) AND ((e.data_chiusura_iscrizioni IS NULL) OR (CURRENT_DATE <= e.data_chiusura_iscrizioni))))))",null
+public,partecipazioni_eventi,Participants read own registrations,PERMISSIVE,{authenticated},SELECT,(partecipante_id = ( SELECT auth.uid() AS uid)),null
+public,partecipazioni_eventi,Participants register themselves,PERMISSIVE,{authenticated},INSERT,null,"((partecipante_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1
+   FROM eventi e
+  WHERE ((e.id = partecipazioni_eventi.evento_id) AND ((e.data_apertura_iscrizioni IS NULL) OR (CURRENT_DATE >= e.data_apertura_iscrizioni)) AND ((e.data_chiusura_iscrizioni IS NULL) OR (CURRENT_DATE <= e.data_chiusura_iscrizioni))))))"
+public,partecipazioni_house_of_mentore,Owner and organizer manage House registrations,PERMISSIVE,{authenticated},ALL,"has_role(ARRAY['owner'::app_role, 'organizer'::app_role])","has_role(ARRAY['owner'::app_role, 'organizer'::app_role])"
+public,partecipazioni_house_of_mentore,Participants create own House registrations,PERMISSIVE,{authenticated},INSERT,null,"((partecipante_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM house_of_mentore h
+  WHERE ((h.id = partecipazioni_house_of_mentore.evento_id) AND (h.iscrizioni_aperte = true)))))"
+public,partecipazioni_house_of_mentore,Participants delete own House registrations,PERMISSIVE,{authenticated},DELETE,"((partecipante_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM house_of_mentore h
+  WHERE ((h.id = partecipazioni_house_of_mentore.evento_id) AND (h.iscrizioni_aperte = true)))))",null
+public,partecipazioni_house_of_mentore,Participants read own House registrations,PERMISSIVE,{authenticated},SELECT,(partecipante_id = auth.uid()),null
+public,partecipazioni_house_of_mentore,Participants update own House registrations,PERMISSIVE,{authenticated},UPDATE,"((partecipante_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM house_of_mentore h
+  WHERE ((h.id = partecipazioni_house_of_mentore.evento_id) AND (h.iscrizioni_aperte = true)))))","((partecipante_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM house_of_mentore h
+  WHERE ((h.id = partecipazioni_house_of_mentore.evento_id) AND (h.iscrizioni_aperte = true)))))"
+public,questionari,questionari_admin_all,PERMISSIVE,{authenticated},ALL,app_backoffice_admin(),app_backoffice_admin()
+public,questionari,questionari_evento_partecipante_select,PERMISSIVE,{authenticated},SELECT,"((provider = 'interno'::questionario_provider) AND (EXISTS ( SELECT 1
+   FROM partecipazioni_eventi pe
+  WHERE ((pe.evento_id = questionari.evento_id) AND (pe.partecipante_id = auth.uid())))))",null
+public,questionari,questionari_mentoraggio_mentore_insert,PERMISSIVE,{authenticated},INSERT,null,"((provider = 'pubblico'::questionario_provider) AND (created_by = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM mentoraggio_mentori mm
+  WHERE ((mm.mentoraggio_id = questionari.mentoraggio_id) AND (mm.mentore_id = auth.uid())))))"
+public,questionari,questionari_mentoraggio_mentore_select,PERMISSIVE,{authenticated},SELECT,"((provider = 'pubblico'::questionario_provider) AND (EXISTS ( SELECT 1
+   FROM mentoraggio_mentori mm
+  WHERE ((mm.mentoraggio_id = questionari.mentoraggio_id) AND (mm.mentore_id = auth.uid())))))",null
+public,questionari_compilazioni,questionari_compilazioni_delete_own,PERMISSIVE,{authenticated},DELETE,(user_id = auth.uid()),null
+public,questionari_compilazioni,questionari_compilazioni_insert_own,PERMISSIVE,{authenticated},INSERT,null,"((user_id = auth.uid()) AND (EXISTS ( SELECT 1
+   FROM (questionari q
+     JOIN partecipazioni_eventi pe ON ((pe.evento_id = q.evento_id)))
+  WHERE ((q.id = questionari_compilazioni.questionario_id) AND (q.provider = 'interno'::questionario_provider) AND (q.aperto = true) AND ((q.data_apertura IS NULL) OR (q.data_apertura <= now())) AND ((q.data_chiusura IS NULL) OR (q.data_chiusura >= now())) AND (pe.partecipante_id = auth.uid()) AND (pe.presente = true)))))"
+public,questionari_compilazioni,questionari_compilazioni_select_own,PERMISSIVE,{authenticated},SELECT,((user_id = auth.uid()) OR app_backoffice_admin()),null
+public,questionari_domande,questionari_domande_admin_all,PERMISSIVE,{authenticated},ALL,app_backoffice_admin(),app_backoffice_admin()
+public,questionari_domande,questionari_domande_select,PERMISSIVE,{authenticated},SELECT,"(app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM questionari_template qt
+  WHERE ((qt.id = questionari_domande.template_id) AND (qt.attivo = true) AND (qt.predefinito = true)))))",null
+public,questionari_risposte,questionari_risposte_insert,PERMISSIVE,{authenticated},INSERT,null,"(EXISTS ( SELECT 1
+   FROM questionari_compilazioni c
+  WHERE ((c.id = questionari_risposte.compilazione_id) AND (c.user_id = auth.uid()))))"
+public,questionari_risposte,questionari_risposte_select,PERMISSIVE,{authenticated},SELECT,"(app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM questionari_compilazioni c
+  WHERE ((c.id = questionari_risposte.compilazione_id) AND (c.user_id = auth.uid())))))",null
+public,questionari_template,questionari_template_admin_all,PERMISSIVE,{authenticated},ALL,app_backoffice_admin(),app_backoffice_admin()
+public,questionari_template,questionari_template_select,PERMISSIVE,{authenticated},SELECT,(app_backoffice_admin() OR ((attivo = true) AND (predefinito = true))),null
+public,risorse_mentoring,risorse_mentoring_admin,PERMISSIVE,{authenticated},ALL,app_backoffice_admin(),app_backoffice_admin()
+public,risorse_mentoring,risorse_mentoring_select,PERMISSIVE,{authenticated},SELECT,((attivo = true) OR app_backoffice_admin()),null
+public,ssd,Owner can delete SSD,PERMISSIVE,{authenticated},DELETE,has_role(ARRAY['owner'::app_role]),null
+public,ssd,Owner can insert SSD,PERMISSIVE,{authenticated},INSERT,null,has_role(ARRAY['owner'::app_role])
+public,ssd,Owner can update SSD,PERMISSIVE,{authenticated},UPDATE,has_role(ARRAY['owner'::app_role]),has_role(ARRAY['owner'::app_role])
+public,ssd,authenticated can read ssd,PERMISSIVE,{authenticated},SELECT,true,null
+public,user_roles,Owner manages application roles,PERMISSIVE,{authenticated},ALL,has_role(ARRAY['owner'::app_role]),has_role(ARRAY['owner'::app_role])
+public,user_roles,Users read own role and owner reads all,PERMISSIVE,{authenticated},SELECT,((user_id = auth.uid()) OR has_role(ARRAY['owner'::app_role])),null
+public,user_roles,user_roles_backoffice_select,PERMISSIVE,{authenticated},SELECT,app_backoffice_admin(),null
+public,user_roles,user_roles_owner_update,PERMISSIVE,{authenticated},UPDATE,app_owner(),app_owner()
+public,user_roles,users can read own role,PERMISSIVE,{authenticated},SELECT,(auth.uid() = user_id),null
+storage,objects,locandine_admin_delete,PERMISSIVE,{authenticated},DELETE,((bucket_id = 'locandine'::text) AND app_backoffice_admin()),null
+storage,objects,locandine_admin_insert,PERMISSIVE,{authenticated},INSERT,null,"((bucket_id = 'locandine'::text) AND app_backoffice_admin() AND (storage.extension(name) = ANY (ARRAY['jpg'::text, 'jpeg'::text, 'png'::text])))"
+storage,objects,locandine_admin_select,PERMISSIVE,{authenticated},SELECT,((bucket_id = 'locandine'::text) AND app_backoffice_admin()),null
+storage,objects,locandine_admin_update,PERMISSIVE,{authenticated},UPDATE,((bucket_id = 'locandine'::text) AND app_backoffice_admin()),"((bucket_id = 'locandine'::text) AND app_backoffice_admin() AND (storage.extension(name) = ANY (ARRAY['jpg'::text, 'jpeg'::text, 'png'::text])))"
+storage,objects,risorse_mentoring_delete,PERMISSIVE,{authenticated},DELETE,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin()),null
+storage,objects,risorse_mentoring_insert,PERMISSIVE,{authenticated},INSERT,null,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin())
+storage,objects,risorse_mentoring_select,PERMISSIVE,{authenticated},SELECT,(bucket_id = 'risorse-mentoring'::text),null
+storage,objects,risorse_mentoring_update,PERMISSIVE,{authenticated},UPDATE,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin()),((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin())
+storage,objects,risorse_storage_delete,PERMISSIVE,{authenticated},DELETE,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin()),null
+storage,objects,risorse_storage_insert,PERMISSIVE,{authenticated},INSERT,null,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin())
+storage,objects,risorse_storage_select,PERMISSIVE,{authenticated},SELECT,(bucket_id = 'risorse-mentoring'::text),null
+storage,objects,risorse_storage_update,PERMISSIVE,{authenticated},UPDATE,((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin()),((bucket_id = 'risorse-mentoring'::text) AND app_backoffice_admin())
+storage,objects,schede_sintesi_delete,PERMISSIVE,{authenticated},DELETE,"((bucket_id = 'schede-sintesi'::text) AND (app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM (mentoraggio_mentori mm
+     JOIN mentoraggi m ON ((m.id = mm.mentoraggio_id)))
+  WHERE (((mm.mentoraggio_id)::text = split_part(objects.name, '/'::text, 2)) AND (mm.mentore_id = auth.uid()) AND ((m.stato)::text = 'Completato'::text))))))",null
+storage,objects,schede_sintesi_insert,PERMISSIVE,{authenticated},INSERT,null,"((bucket_id = 'schede-sintesi'::text) AND (app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM (mentoraggio_mentori mm
+     JOIN mentoraggi m ON ((m.id = mm.mentoraggio_id)))
+  WHERE (((mm.mentoraggio_id)::text = split_part(objects.name, '/'::text, 2)) AND (mm.mentore_id = auth.uid()) AND ((m.stato)::text = 'Completato'::text))))))"
+storage,objects,schede_sintesi_select,PERMISSIVE,{authenticated},SELECT,"((bucket_id = 'schede-sintesi'::text) AND (app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM mentoraggio_mentori mm
+  WHERE (((mm.mentoraggio_id)::text = split_part(objects.name, '/'::text, 2)) AND (mm.mentore_id = auth.uid())))) OR (EXISTS ( SELECT 1
+   FROM (mentoraggi m
+     JOIN insegnamenti i ON ((i.id = m.insegnamento_id)))
+  WHERE (((m.id)::text = split_part(objects.name, '/'::text, 2)) AND (i.docente_id = auth.uid()))))))",null
+storage,objects,schede_sintesi_update,PERMISSIVE,{authenticated},UPDATE,"((bucket_id = 'schede-sintesi'::text) AND (app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM (mentoraggio_mentori mm
+     JOIN mentoraggi m ON ((m.id = mm.mentoraggio_id)))
+  WHERE (((mm.mentoraggio_id)::text = split_part(objects.name, '/'::text, 2)) AND (mm.mentore_id = auth.uid()) AND ((m.stato)::text = 'Completato'::text))))))","((bucket_id = 'schede-sintesi'::text) AND (app_backoffice_admin() OR (EXISTS ( SELECT 1
+   FROM (mentoraggio_mentori mm
+     JOIN mentoraggi m ON ((m.id = mm.mentoraggio_id)))
+  WHERE (((mm.mentoraggio_id)::text = split_part(objects.name, '/'::text, 2)) AND (mm.mentore_id = auth.uid()) AND ((m.stato)::text = 'Completato'::text))))))"
