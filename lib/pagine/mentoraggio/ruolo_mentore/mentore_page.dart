@@ -26,21 +26,47 @@ class _MentorePageState extends State<MentorePage> {
   ///
   /// La lista è indipendente da Mentee e dalla maschera di modifica.
   static const _ordineVisualizzazione = <String>[
-    'azioni_miglioramento',
-    'osservazioni_aula',
-    'osservazioni_focus_group',
-    'stato_mentoraggio',
-    'stato',
-  ];
+      'data_inizio',
+      'data_fine',
+      'giorni_orari_lezioni',
+      'sede',
+      'numero_studenti',
+      'svolgimento',
+      'note',
+      'stato_mentoraggio',
+      'stato',
+      'osservazioni_aula',
+      'data_visita_1',
+      'data_visita_2',
+      'data_visita_3',
+      'data_visita_4',
+      'osservazioni_focus_group',
+      'data_focus_group',
+      'data_incontro_finale',
+      'scheda_sintesi',
+      'data_invio_scheda',
+      'azioni_miglioramento',
+      'anno_accademico',
+      'link_questionario',
+    ];
 
   static const configurazione = ConfigurazionePaginaDinamica(
     tabella: 'mentoraggi',
     ordineCampi: <String>[
-      'azioni_miglioramento',
-      'osservazioni_aula',
-      'osservazioni_focus_group',
       'stato_mentoraggio',
       'stato',
+      'osservazioni_aula',
+      'data_visita_1',
+      'data_visita_2',
+      'data_visita_3',
+      'data_visita_4',
+      'osservazioni_focus_group',
+      'data_focus_group',
+      'data_incontro_finale',
+      'scheda_sintesi',
+      'data_invio_scheda',
+      'azioni_miglioramento',
+      'link_questionario',
     ],
     campi: <String, PersonalizzazioneCampo>{
       'insegnamento_id': PersonalizzazioneCampo(nascosto: true),
@@ -67,6 +93,9 @@ class _MentorePageState extends State<MentorePage> {
 
   late final MentoreController controller;
   late final QuestionarioPubblicoController questionariController;
+
+  Iterable<PercorsoMentore> get _percorsiPrecedenti => controller.percorsi
+      .where((percorso) => !percorso.annoCorrente);
 
   /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
@@ -180,21 +209,37 @@ class _MentorePageState extends State<MentorePage> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'Ruolo mentore · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-            ),
-            if (percorso.annoCorrente)
-              FilledButton.icon(
-                onPressed: controller.salvataggio ? null : _modifica,
-                icon: const Icon(Icons.edit),
-                label: const Text('Modifica'),
-              ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final titolo = Text(
+              'Ruolo mentore · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
+              style: Theme.of(context).textTheme.headlineSmall,
+            );
+            if (!percorso.annoCorrente) {
+              return titolo;
+            }
+            final pulsante = FilledButton.icon(
+              onPressed: controller.salvataggio ? null : _modifica,
+              icon: const Icon(Icons.edit),
+              label: const Text('Modifica'),
+            );
+            if (constraints.maxWidth < 480) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  titolo,
+                  const SizedBox(height: 12),
+                  pulsante,
+                ],
+              );
+            }
+            return Row(
+              children: <Widget>[
+                Expanded(child: titolo),
+                pulsante,
+              ],
+            );
+          },
         ),
         _rigaInformazione(
           'Insegnamento',
@@ -241,8 +286,38 @@ class _MentorePageState extends State<MentorePage> {
         _SchedaSintesiFileCard(
           mentoraggio: percorso.mentoraggio,
           controller: controller,
+          solaLettura: !percorso.annoCorrente,
           onAggiornato: controller.carica,
         ),
+        if (percorso.annoCorrente && _percorsiPrecedenti.isNotEmpty) ...[
+          const Divider(height: 40),
+          Text(
+            'Percorsi precedenti',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          for (final storico in _percorsiPrecedenti) ...[
+            Text(
+              '${storico.insegnamento['insegnamento'] ?? ''} · '
+              '${storico.mentoraggio['anno_accademico'] ?? ''}',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            _rigaInformazione(
+              'Scheda di sintesi',
+              storico.mentoraggio['scheda_sintesi']?.toString() ?? '',
+            ),
+            _rigaInformazione(
+              'Azioni di miglioramento',
+              storico.mentoraggio['azioni_miglioramento']?.toString() ?? '',
+            ),
+            _SchedaSintesiFileCard(
+              mentoraggio: storico.mentoraggio,
+              controller: controller,
+              solaLettura: true,
+            ),
+            const Divider(height: 32),
+          ],
+        ],
       ],
     );
   }
@@ -371,11 +446,13 @@ class _SchedaSintesiFileCard extends StatefulWidget {
   const _SchedaSintesiFileCard({
     required this.mentoraggio,
     required this.controller,
+    this.solaLettura = false,
     this.onAggiornato,
   });
 
   final Map<String, dynamic> mentoraggio;
   final MentoreController controller;
+  final bool solaLettura;
   final Future<void> Function()? onAggiornato;
 
   @override
@@ -411,7 +488,9 @@ class _SchedaSintesiFileCardState extends State<_SchedaSintesiFileCard> {
             ),
             const SizedBox(height: 6),
             Text(
-              _completato
+              widget.solaLettura
+                  ? 'Documento disponibile in sola lettura.'
+                  : _completato
                   ? 'Puoi caricare o sostituire la scheda definitiva in PDF o DOCX.'
                   : 'Il caricamento è disponibile quando il mentoraggio è in stato Completato.',
             ),
@@ -426,15 +505,16 @@ class _SchedaSintesiFileCardState extends State<_SchedaSintesiFileCard> {
                     icon: const Icon(Icons.description_outlined),
                     label: const Text('Apri / scarica'),
                   ),
-                FilledButton.tonalIcon(
-                  onPressed: !_completato || _operazione ? null : _carica,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(
-                    _valoreFile.isEmpty
-                        ? 'Carica scheda di sintesi'
-                        : 'Sostituisci scheda',
+                if (!widget.solaLettura)
+                  FilledButton.tonalIcon(
+                    onPressed: !_completato || _operazione ? null : _carica,
+                    icon: const Icon(Icons.upload_file_outlined),
+                    label: Text(
+                      _valoreFile.isEmpty
+                          ? 'Carica scheda di sintesi'
+                          : 'Sostituisci scheda',
+                    ),
                   ),
-                ),
               ],
             ),
           ],

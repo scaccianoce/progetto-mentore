@@ -453,9 +453,9 @@ CREATE POLICY "questionari_admin_all" ON "public"."questionari" AS PERMISSIVE FO
 
 DROP POLICY IF EXISTS "questionari_evento_partecipante_select" ON "public"."questionari";
 CREATE POLICY "questionari_evento_partecipante_select" ON "public"."questionari" AS PERMISSIVE FOR SELECT TO authenticated
-  USING (((provider = 'interno'::questionario_provider) AND (EXISTS ( SELECT 1
+  USING (((provider = 'interno'::questionario_provider) AND (aperto = true) AND ((data_apertura IS NULL) OR (data_apertura <= now())) AND ((data_chiusura IS NULL) OR (data_chiusura >= now())) AND (EXISTS ( SELECT 1
    FROM partecipazioni_eventi pe
-  WHERE ((pe.evento_id = questionari.evento_id) AND (pe.partecipante_id = auth.uid()))))));
+  WHERE ((pe.evento_id = questionari.evento_id) AND (pe.partecipante_id = auth.uid()) AND (pe.presente = true)))));
 
 DROP POLICY IF EXISTS "questionari_mentoraggio_mentore_insert" ON "public"."questionari";
 CREATE POLICY "questionari_mentoraggio_mentore_insert" ON "public"."questionari" AS PERMISSIVE FOR INSERT TO authenticated
@@ -492,8 +492,9 @@ CREATE POLICY "questionari_domande_admin_all" ON "public"."questionari_domande" 
 DROP POLICY IF EXISTS "questionari_domande_select" ON "public"."questionari_domande";
 CREATE POLICY "questionari_domande_select" ON "public"."questionari_domande" AS PERMISSIVE FOR SELECT TO authenticated
   USING ((app_backoffice_admin() OR (EXISTS ( SELECT 1
-   FROM questionari_template qt
-  WHERE ((qt.id = questionari_domande.template_id) AND (qt.attivo = true) AND (qt.predefinito = true))))));
+   FROM (questionari q
+     JOIN partecipazioni_eventi pe ON ((pe.evento_id = q.evento_id)))
+  WHERE ((q.template_id = questionari_domande.template_id) AND (q.provider = 'interno'::questionario_provider) AND (q.aperto = true) AND ((q.data_apertura IS NULL) OR (q.data_apertura <= now())) AND ((q.data_chiusura IS NULL) OR (q.data_chiusura >= now())) AND (pe.partecipante_id = auth.uid()) AND (pe.presente = true)))));
 
 DROP POLICY IF EXISTS "questionari_risposte_insert" ON "public"."questionari_risposte";
 CREATE POLICY "questionari_risposte_insert" ON "public"."questionari_risposte" AS PERMISSIVE FOR INSERT TO authenticated

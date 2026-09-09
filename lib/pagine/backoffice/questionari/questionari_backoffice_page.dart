@@ -160,6 +160,15 @@ class _QuestionariBackofficePageState extends State<QuestionariBackofficePage> {
                     icon: const Icon(Icons.arrow_downward),
                   ),
                   IconButton(
+                    tooltip: 'Modifica domanda',
+                    onPressed: () => _modificaDomanda(
+                      context,
+                      template,
+                      domande[indice],
+                    ),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
                     tooltip: 'Elimina domanda',
                     onPressed: () => _eliminaDomanda(context, domande[indice]),
                     icon: const Icon(Icons.delete_outline),
@@ -302,26 +311,47 @@ class _QuestionariBackofficePageState extends State<QuestionariBackofficePage> {
   Future<void> _nuovaDomanda(
     BuildContext context,
     Map<String, dynamic> template,
+  ) => _editorDomanda(context, template, null);
+
+  Future<void> _modificaDomanda(
+    BuildContext context,
+    Map<String, dynamic> template,
+    Map<String, dynamic> domanda,
+  ) => _editorDomanda(context, template, domanda);
+
+  Future<void> _editorDomanda(
+    BuildContext context,
+    Map<String, dynamic> template,
+    Map<String, dynamic>? iniziali,
   ) async {
-    final testo = TextEditingController();
-    final opzioni = TextEditingController();
-    var tipo = 'testo_breve';
-    var obbligatoria = false;
+    final testo = TextEditingController(
+      text: iniziali?['testo']?.toString() ?? '',
+    );
+    final opzioni = TextEditingController(
+      text: _testoOpzioni(iniziali),
+    );
+    var tipo = iniziali?['tipo']?.toString() ?? 'testo_breve';
+    var obbligatoria = iniziali?['obbligatoria'] == true;
 
     final domande = controller.domandeTemplate(template['id'].toString());
-    final ordine = domande.isEmpty
+    final ordine = iniziali?['ordine'] is int
+        ? iniziali!['ordine'] as int
+        : int.tryParse(iniziali?['ordine']?.toString() ?? '') ??
+            (domande.isEmpty
         ? 10
         : ((domande
                   .map((d) => int.tryParse(d['ordine'].toString()) ?? 0)
                   .reduce((a, b) => a > b ? a : b)) +
-              10);
+              10));
 
     final salva =
         await showDialog<bool>(
           context: context,
           builder: (context) => StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
-              title: const Text('Aggiungi domanda'),
+              title: Text(
+                iniziali == null ? 'Aggiungi domanda' : 'Modifica domanda',
+              ),
               content: SizedBox(
                 width: 600,
                 child: Column(
@@ -400,7 +430,7 @@ class _QuestionariBackofficePageState extends State<QuestionariBackofficePage> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Aggiungi'),
+                  child: Text(iniziali == null ? 'Aggiungi' : 'Salva'),
                 ),
               ],
             ),
@@ -430,20 +460,37 @@ class _QuestionariBackofficePageState extends State<QuestionariBackofficePage> {
       opzioniJson = <String, dynamic>{'min': minimo, 'max': massimo};
     }
 
-    final errore = await controller.aggiungiDomanda(
-      templateId: template['id'].toString(),
-      ordine: ordine,
-      testo: testo.text,
-      tipo: tipo,
-      obbligatoria: obbligatoria,
-      opzioni: opzioniJson,
-    );
+    final errore = iniziali == null
+        ? await controller.aggiungiDomanda(
+            templateId: template['id'].toString(),
+            ordine: ordine,
+            testo: testo.text,
+            tipo: tipo,
+            obbligatoria: obbligatoria,
+            opzioni: opzioniJson,
+          )
+        : await controller.salvaDomanda(
+            domandaId: iniziali['id'].toString(),
+            testo: testo.text,
+            tipo: tipo,
+            obbligatoria: obbligatoria,
+            opzioni: opzioniJson,
+          );
 
     testo.dispose();
     opzioni.dispose();
 
     if (!context.mounted) return;
     _messaggio(context, errore);
+  }
+
+  String _testoOpzioni(Map<String, dynamic>? domanda) {
+    final opzioni = domanda?['opzioni'];
+    if (opzioni is List) return opzioni.join(';');
+    if (opzioni is Map) {
+      return '${opzioni['min'] ?? 1};${opzioni['max'] ?? 5}';
+    }
+    return '';
   }
 
   /// Gestisce l’operazione interna “sposta domanda” della pagina.

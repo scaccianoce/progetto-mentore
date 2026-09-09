@@ -160,7 +160,7 @@ class _NewsPageState extends State<NewsPage> {
 
         return Column(
           children: <Widget>[
-            Expanded(child: elenco),
+            SizedBox(height: 220, child: elenco),
             const Divider(height: 20),
             Expanded(child: dettaglio),
           ],

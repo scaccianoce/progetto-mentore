@@ -174,11 +174,7 @@ class NotificheRepository {
   /// La chiamata rimane qui perché non è un'operazione CRUD di tabella.
   Future<void> inviaMessaggio(String messaggioId) async {
     try {
-      final user = _client.auth.currentUser;
       final session = _client.auth.currentSession;
-      print('DEBUG NOTIFICHE INVIO -> userId=${user?.id}');
-      print('DEBUG NOTIFICHE INVIO -> sessionExists=${session != null}');
-      print('DEBUG NOTIFICHE INVIO -> sessionUserId=${session?.user.id}');
       if (session == null || session.accessToken.isEmpty) {
         throw StateError('Sessione Supabase non disponibile per l’invio.');
       }

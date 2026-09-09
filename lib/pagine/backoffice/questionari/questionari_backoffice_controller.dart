@@ -152,6 +152,40 @@ class QuestionariBackofficeController extends ChangeNotifier {
         },
       );
 
+  Future<String?> salvaDomanda({
+    required String domandaId,
+    required String testo,
+    required String tipo,
+    required bool obbligatoria,
+    Object? opzioni,
+  }) =>
+      _esegui(
+        messaggio: 'Modifica della domanda non riuscita.',
+        azione: () async {
+          _verificaGestore();
+
+          final testoPulito = testo.trim();
+          if (testoPulito.isEmpty) {
+            throw const AppException(
+              'Testo della domanda obbligatorio.',
+            );
+          }
+
+          await db.tabella('questionari_domande').aggiorna(
+            <String, dynamic>{
+              'testo': testoPulito,
+              'tipo': tipo,
+              'obbligatoria': obbligatoria,
+              'opzioni': opzioni,
+            },
+            filtri: <FiltroDb>[
+              FiltroDb.uguale('id', domandaId),
+            ],
+            colonne: 'id',
+          );
+        },
+      );
+
   Future<String?> eliminaDomanda(String domandaId) =>
       _esegui(
         messaggio: 'Eliminazione della domanda non riuscita.',

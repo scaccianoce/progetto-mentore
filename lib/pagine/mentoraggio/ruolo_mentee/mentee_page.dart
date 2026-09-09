@@ -180,21 +180,37 @@ class _MenteePageState extends State<MenteePage> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'Ruolo mentee · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-            ),
-            if (percorso.annoCorrente)
-              FilledButton.icon(
-                onPressed: controller.salvataggio ? null : _modifica,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Modifica dati annuali'),
-              ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final titolo = Text(
+              'Ruolo mentee · ${percorso.mentoraggio['anno_accademico'] ?? ''}',
+              style: Theme.of(context).textTheme.headlineSmall,
+            );
+            if (!percorso.annoCorrente) {
+              return titolo;
+            }
+            final pulsante = FilledButton.icon(
+              onPressed: controller.salvataggio ? null : _modifica,
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Modifica dati annuali'),
+            );
+            if (constraints.maxWidth < 480) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  titolo,
+                  const SizedBox(height: 12),
+                  pulsante,
+                ],
+              );
+            }
+            return Row(
+              children: <Widget>[
+                Expanded(child: titolo),
+                pulsante,
+              ],
+            );
+          },
         ),
         ListTile(
           contentPadding: EdgeInsets.zero,

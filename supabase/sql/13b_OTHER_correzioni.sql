@@ -936,3 +936,55 @@ ADD COLUMN attiva boolean NOT NULL DEFAULT true;
 
 COMMENT ON COLUMN public.house_of_mentore.attiva IS
 'Indica se la House of Mentore è attiva/visibile nell''applicazione.';
+
+
+begin;
+
+drop policy if exists "questionari_evento_partecipante_select"
+on public.questionari;
+
+create policy "questionari_evento_partecipante_select"
+on public.questionari
+as permissive
+for select
+to authenticated
+using (
+  provider = 'interno'::questionario_provider
+  and aperto = true
+  and (data_apertura is null or data_apertura <= now())
+  and (data_chiusura is null or data_chiusura >= now())
+  and exists (
+    select 1
+    from public.partecipazioni_eventi pe
+    where pe.evento_id = questionari.evento_id
+      and pe.partecipante_id = auth.uid()
+      and pe.presente = true
+  )
+);
+
+drop policy if exists "questionari_domande_select"
+on public.questionari_domande;
+
+create policy "questionari_domande_select"
+on public.questionari_domande
+as permissive
+for select
+to authenticated
+using (
+  app_backoffice_admin()
+  or exists (
+    select 1
+    from public.questionari q
+    join public.partecipazioni_eventi pe
+      on pe.evento_id = q.evento_id
+    where q.template_id = questionari_domande.template_id
+      and q.provider = 'interno'::questionario_provider
+      and q.aperto = true
+      and (q.data_apertura is null or q.data_apertura <= now())
+      and (q.data_chiusura is null or q.data_chiusura >= now())
+      and pe.partecipante_id = auth.uid()
+      and pe.presente = true
+  )
+);
+
+commit;

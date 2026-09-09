@@ -7,6 +7,7 @@ import '../../ui/dinamico_schema.dart';
 import '../../ui/dinamico_maschera.dart';
 import '../../app/app_session_controller.dart';
 import '../../ui/questionario_interno_dialog.dart';
+import '../../supporto/questionario_risultati_controller.dart';
 import '../../supporto/utilita.dart';
 import 'eventi_controller.dart';
 
@@ -40,6 +41,7 @@ class _EventiPageState extends State<EventiPage> {
   ];
 
   late final EventiController controller;
+  late final QuestionarioRisultatiController risultatiController;
 
   bool get _partecipante => widget.sessione.ruolo == AppRole.participant;
 
@@ -110,6 +112,7 @@ class _EventiPageState extends State<EventiPage> {
     super.initState();
 
     controller = EventiController(widget.sessione)..carica();
+    risultatiController = QuestionarioRisultatiController(widget.sessione);
   }
 
   /// Rilascia listener e controller associati allo stato della pagina.
@@ -182,7 +185,7 @@ class _EventiPageState extends State<EventiPage> {
                         }
                         return Column(
                           children: <Widget>[
-                            Expanded(child: elenco),
+                            SizedBox(height: 220, child: elenco),
                             const Divider(height: 20),
                             Expanded(child: dettaglio),
                           ],
@@ -240,14 +243,22 @@ class _EventiPageState extends State<EventiPage> {
       padding: const EdgeInsets.all(20),
       children: <Widget>[
         if (locandina.isNotEmpty) ...[
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              locandina,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Padding(
-                padding: EdgeInsets.all(12),
-                child: Text('Impossibile caricare la locandina.'),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 500,
+                maxHeight: 700,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  locandina,
+                  fit: BoxFit.scaleDown,
+                  errorBuilder: (context, error, stackTrace) => const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('Impossibile caricare la locandina.'),
+                  ),
+                ),
               ),
             ),
           ),
@@ -317,6 +328,12 @@ class _EventiPageState extends State<EventiPage> {
             spacing: 8,
             runSpacing: 8,
             children: <Widget>[
+              if (haQuestionario)
+                OutlinedButton.icon(
+                  onPressed: () => _esportaRisposteQuestionario(id),
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('Esporta risposte CSV'),
+                ),
               OutlinedButton.icon(
                 onPressed: () => _apriEditor(evento),
                 icon: const Icon(Icons.edit),
@@ -445,6 +462,18 @@ class _EventiPageState extends State<EventiPage> {
     if (compilato == true) {
       await controller.carica();
     }
+  }
+
+  Future<void> _esportaRisposteQuestionario(String eventoId) async {
+    final questionarioId = controller.questionarioPerEvento[eventoId];
+    if (questionarioId == null) return;
+
+    final errore = await risultatiController.esportaCsvRisultati(questionarioId);
+    if (!mounted || errore == null) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(errore)));
   }
 
 

@@ -98,35 +98,57 @@ class _ProfiloPageState extends State<ProfiloPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Il mio profilo',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _controller.salvataggioPassword
-                          ? null
-                          : _cambiaPassword,
-                      icon: const Icon(Icons.password_outlined),
-                      label: const Text('Modifica password'),
-                    ),
-                    const SizedBox(width: 8),
-                    if (_controller.puoModificare)
-                      FilledButton.icon(
-                        onPressed: _controller.salvataggio ? null : _apriEditor,
-                        icon: const Icon(Icons.edit_outlined),
-                        label: const Text('Modifica'),
-                      )
-                    else
-                      OutlinedButton.icon(
-                        onPressed: _controller.richiediModifica,
-                        icon: const Icon(Icons.lock_open_outlined),
-                        label: const Text('Richiedi modifica'),
-                      ),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final titolo = Text(
+                      'Il mio profilo',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    );
+                    final pulsanti = Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: <Widget>[
+                        OutlinedButton.icon(
+                          onPressed: _controller.salvataggioPassword
+                              ? null
+                              : _cambiaPassword,
+                          icon: const Icon(Icons.password_outlined),
+                          label: const Text('Modifica password'),
+                        ),
+                        if (_controller.puoModificare)
+                          FilledButton.icon(
+                            onPressed: _controller.salvataggio
+                                ? null
+                                : _apriEditor,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Modifica'),
+                          )
+                        else
+                          OutlinedButton.icon(
+                            onPressed: _controller.richiediModifica,
+                            icon: const Icon(Icons.lock_open_outlined),
+                            label: const Text('Richiedi modifica'),
+                          ),
+                      ],
+                    );
+                    if (constraints.maxWidth < 520) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          titolo,
+                          const SizedBox(height: 12),
+                          pulsanti,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: <Widget>[
+                        Expanded(child: titolo),
+                        pulsanti,
+                      ],
+                    );
+                  },
                 ),
                 if (_controller.errore != null) ...<Widget>[
                   const SizedBox(height: 12),
