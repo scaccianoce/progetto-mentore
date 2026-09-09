@@ -154,6 +154,7 @@ class NotifichePushService {
       final token = await _messaging.getToken(
         vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
       );
+      print('FCM token: $token');
 
       if (token == null || token.trim().isEmpty) {
         _errore = 'Firebase non ha restituito un token FCM.';

@@ -213,12 +213,11 @@ class _NotificheMessaggiBackofficePageState
                                 onPressed: () => _modificaMessaggio(m),
                                 icon: const Icon(Icons.edit_outlined),
                               ),
-                            if (modificabile)
-                              IconButton(
-                                tooltip: 'Elimina notifica programmata',
-                                onPressed: () => _eliminaMessaggio(m),
-                                icon: const Icon(Icons.delete_outline),
-                              ),
+                            IconButton(
+                              tooltip: 'Elimina notifica',
+                              onPressed: () => _eliminaMessaggio(m),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
                           ],
                         ),
                       ),
@@ -286,14 +285,13 @@ class _NotificheMessaggiBackofficePageState
 
   /// Elimina messaggio.
   Future<void> _eliminaMessaggio(Map<String, dynamic> messaggio) async {
-    if (!_programmatoModificabile(messaggio)) return;
     final id = messaggio['id']?.toString();
     if (id == null || id.isEmpty) return;
 
     final conferma = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Elimina notifica programmata'),
+            title: const Text('Elimina notifica'),
             content: Text(
               'Vuoi eliminare definitivamente "${messaggio['titolo'] ?? 'questa notifica'}"?\n\n'
               'Saranno eliminati anche i destinatari già associati alla notifica.',
@@ -317,7 +315,7 @@ class _NotificheMessaggiBackofficePageState
       await widget.controller.eliminaMessaggio(id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notifica programmata eliminata.')),
+        const SnackBar(content: Text('Notifica eliminata.')),
       );
       await _carica();
     } catch (e) {

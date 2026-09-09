@@ -138,13 +138,20 @@ async function verificaChiamante(
   const apiKey = req.headers.get('apikey')
   if (!authHeader || !apiKey) throw new Error('Utente non autenticato')
 
+  const accessToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+  if (!accessToken) throw new Error('Token utente mancante')
+
   const userClient = createClient(Deno.env.get('SUPABASE_URL')!, apiKey, {
-    global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
-  const { data: userData, error: userError } = await userClient.auth.getUser()
-  if (userError || !userData.user) throw new Error('Utente non autenticato')
+  const { data: userData, error: userError } =
+    await userClient.auth.getUser(accessToken)
+  if (userError || !userData.user) {
+    throw new Error(
+      `Token utente non valido: ${userError?.message ?? 'utente assente'}`,
+    )
+  }
 
   const { data: roleRow, error: roleError } = await supabaseAdmin
     .from('user_roles')

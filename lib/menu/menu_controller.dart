@@ -226,9 +226,7 @@ class MenuNovitaController extends ChangeNotifier {
 
   /// Ricarica in una sola RPC lo stato di tutte le voci monitorate.
   Future<void> carica() async {
-      debugPrint('MENU NOVITA - userIdCorrente: ${database.userIdCorrente}',);
     if (database.userIdCorrente == null) {
-      debugPrint('MENU NOVITA - nessun utente corrente',);
       _novita = const <String, bool>{};
       notifyListeners();
       return;
@@ -240,21 +238,12 @@ class MenuNovitaController extends ChangeNotifier {
 
     try {
       final raw = await database.rpcMappa('menu_stato_novita');
-      debugPrint('MENU NOVITA - risposta RPC: $raw',);
 
       _novita = <String, bool>{
         for (final voce in (raw ?? const <String, dynamic>{}).entries)
           voce.key: voce.value == true,
       };
-      
-      debugPrint('MENU NOVITA - mappa elaborata: $_novita',);
-
-      debugPrint('MENU NOVITA - /insegnamento: '
-      '${_novita['/insegnamento']}',);
-
     } catch (e) {
-      debugPrint('MENU NOVITA - ERRORE: $e',);
-      
       _errore = AppErrorMapper.converti(
         e,
         messaggioGenerico:
