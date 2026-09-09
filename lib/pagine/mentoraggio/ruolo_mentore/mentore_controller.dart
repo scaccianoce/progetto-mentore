@@ -288,6 +288,7 @@ class MentoreController extends ChangeNotifier {
         'note',
         'svolgimento',
         'giorni_orari_lezioni',
+        'data_invio_scheda',
         'scheda_sintesi_pdf_url',
         'created_at',
         'updated_at',

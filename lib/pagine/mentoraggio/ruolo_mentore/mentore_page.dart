@@ -87,6 +87,9 @@ class _MentorePageState extends State<MentorePage> {
       'giorni_orari_lezioni': PersonalizzazioneCampo(
         modificabilePartecipante: false,
       ),
+      'data_invio_scheda': PersonalizzazioneCampo(
+        solaLettura: true,
+      ),
       'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
     },
   );

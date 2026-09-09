@@ -145,15 +145,18 @@ class _MascheraDinamicaState extends State<MascheraDinamica> {
       child: Form(
         key: _form,
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              ..._costruisciCampi(),
-              if (widget.contenutoExtra != null) ...[
-                const Divider(height: 28),
-                widget.contenutoExtra!,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                ..._costruisciCampi(),
+                if (widget.contenutoExtra != null) ...[
+                  const Divider(height: 28),
+                  widget.contenutoExtra!,
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

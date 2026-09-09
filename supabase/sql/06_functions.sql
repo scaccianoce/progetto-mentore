@@ -1677,6 +1677,7 @@ declare
     'note',
     'svolgimento',
     'giorni_orari_lezioni',
+    'data_invio_scheda',
     'scheda_sintesi_pdf_url',
     'created_at',
     'updated_at'
@@ -1762,7 +1763,8 @@ begin
   end if;
 
   update public.mentoraggi
-  set scheda_sintesi_pdf_url = nullif(trim(p_storage_path), '')
+  set scheda_sintesi_pdf_url = nullif(trim(p_storage_path), ''),
+      data_invio_scheda = current_date
   where id = p_mentoraggio_id;
 end;
 $function$;
