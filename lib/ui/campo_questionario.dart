@@ -19,29 +19,52 @@ class CampoQuestionario extends StatelessWidget {
   Widget build(BuildContext context) {
     final testo = domanda['testo']?.toString() ?? '';
     final tipo = domanda['tipo']?.toString() ?? 'testo_breve';
-    final etichetta = domanda['obbligatoria'] == true ? '$testo *' : testo;
-    final decorazione = InputDecoration(
-      labelText: etichetta,
+    final domandaDecorazione = BoxDecoration(
+      border: Border.all(color: Theme.of(context).colorScheme.outline),
+      borderRadius: BorderRadius.circular(4),
+    );
+    final rispostaDecorazione = InputDecoration(
+      labelText: 'Risposta',
       border: const OutlineInputBorder(),
     );
 
+    Widget campoRisposta(Widget campo) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: domandaDecorazione,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              domanda['obbligatoria'] == true ? '$testo *' : testo,
+              softWrap: true,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        campo,
+      ],
+    );
+
     if (tipo == 'booleano') {
-      return InputDecorator(
-        decoration: decorazione,
-        child: Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('Sì'),
-              selected: valore == true,
-              onSelected: (_) => onChanged(true),
-            ),
-            ChoiceChip(
-              label: const Text('No'),
-              selected: valore == false,
-              onSelected: (_) => onChanged(false),
-            ),
-          ],
+      return campoRisposta(
+        InputDecorator(
+          decoration: rispostaDecorazione,
+          child: Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Sì'),
+                selected: valore == true,
+                onSelected: (_) => onChanged(true),
+              ),
+              ChoiceChip(
+                label: const Text('No'),
+                selected: valore == false,
+                onSelected: (_) => onChanged(false),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -52,14 +75,16 @@ class CampoQuestionario extends StatelessWidget {
       );
       final minimo = int.tryParse(opzioni['min']?.toString() ?? '') ?? 1;
       final massimo = int.tryParse(opzioni['max']?.toString() ?? '') ?? 5;
-      return DropdownButtonFormField<int>(
-        initialValue: valore as int?,
-        decoration: decorazione,
-        items: [
-          for (var numero = minimo; numero <= massimo; numero++)
-            DropdownMenuItem(value: numero, child: Text(numero.toString())),
-        ],
-        onChanged: onChanged,
+      return campoRisposta(
+        DropdownButtonFormField<int>(
+          initialValue: valore as int?,
+          decoration: rispostaDecorazione,
+          items: [
+            for (var numero = minimo; numero <= massimo; numero++)
+              DropdownMenuItem(value: numero, child: Text(numero.toString())),
+          ],
+          onChanged: onChanged,
+        ),
       );
     }
 
@@ -67,24 +92,28 @@ class CampoQuestionario extends StatelessWidget {
       final opzioni = (domanda['opzioni'] as List? ?? const [])
           .map((opzione) => opzione.toString())
           .toList(growable: false);
-      return DropdownButtonFormField<String>(
-        initialValue: valore?.toString(),
-        isExpanded: true,
-        decoration: decorazione,
-        items: [
-          for (final opzione in opzioni)
-            DropdownMenuItem(value: opzione, child: Text(opzione)),
-        ],
-        onChanged: onChanged,
+      return campoRisposta(
+        DropdownButtonFormField<String>(
+          initialValue: valore?.toString(),
+          isExpanded: true,
+          decoration: rispostaDecorazione,
+          items: [
+            for (final opzione in opzioni)
+              DropdownMenuItem(value: opzione, child: Text(opzione)),
+          ],
+          onChanged: onChanged,
+        ),
       );
     }
 
-    return TextFormField(
-      initialValue: valore?.toString(),
-      minLines: tipo == 'testo_lungo' ? 4 : 1,
-      maxLines: tipo == 'testo_lungo' ? 8 : 1,
-      decoration: decorazione.copyWith(alignLabelWithHint: tipo == 'testo_lungo'),
-      onChanged: onChanged,
+    return campoRisposta(
+      TextFormField(
+        initialValue: valore?.toString(),
+        minLines: tipo == 'testo_lungo' ? 4 : 1,
+        maxLines: tipo == 'testo_lungo' ? 8 : 1,
+        decoration: rispostaDecorazione,
+        onChanged: onChanged,
+      ),
     );
   }
 }

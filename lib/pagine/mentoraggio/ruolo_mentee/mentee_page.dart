@@ -58,7 +58,9 @@ class _MenteePageState extends State<MenteePage> {
     campiModificabiliPartecipante: _campiMentee,
     campi: <String, PersonalizzazioneCampo>{
       'insegnamento_id': PersonalizzazioneCampo(nascosto: true),
-      'anno_accademico': PersonalizzazioneCampo(modificabilePartecipante: false),
+      'anno_accademico': PersonalizzazioneCampo(
+        modificabilePartecipante: false,
+      ),
       'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
     },
   );
@@ -82,90 +84,90 @@ class _MenteePageState extends State<MenteePage> {
   /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          if (controller.caricamento && controller.percorsi.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    animation: controller,
+    builder: (context, _) {
+      if (controller.caricamento && controller.percorsi.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                if (controller.errore != null) ...<Widget>[
-                  Text(
-                    controller.errore!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Expanded(
-                  child: controller.percorsi.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Nessun mentoraggio disponibile nel ruolo mentee.',
-                          ),
-                        )
-                      : LayoutBuilder(
-                          builder: (context, constraints) {
-                            final elenco = _elencoMentoraggi();
-                            final dettaglio = Card(
-                              margin: EdgeInsets.zero,
-                              child: _dettaglio(),
-                            );
-                            if (constraints.maxWidth >= 800) {
-                              return Row(
-                                children: <Widget>[
-                                  SizedBox(width: 350, child: elenco),
-                                  const VerticalDivider(width: 24),
-                                  Expanded(child: dettaglio),
-                                ],
-                              );
-                            }
-                            return Column(
-                              children: <Widget>[
-                                Expanded(child: elenco),
-                                const Divider(height: 20),
-                                Expanded(child: dettaglio),
-                              ],
-                            );
-                          },
-                        ),
-                ),
-              ],
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (controller.errore != null) ...<Widget>[
+              Text(
+                controller.errore!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Expanded(
+              child: controller.percorsi.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Nessun mentoraggio disponibile nel ruolo mentee.',
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        final elenco = _elencoMentoraggi();
+                        final dettaglio = Card(
+                          margin: EdgeInsets.zero,
+                          child: _dettaglio(),
+                        );
+                        if (constraints.maxWidth >= 800) {
+                          return Row(
+                            children: <Widget>[
+                              SizedBox(width: 350, child: elenco),
+                              const VerticalDivider(width: 24),
+                              Expanded(child: dettaglio),
+                            ],
+                          );
+                        }
+                        return Column(
+                          children: <Widget>[
+                            Expanded(flex: 1, child: elenco),
+                            const Divider(height: 20),
+                            Expanded(flex: 2, child: dettaglio),
+                          ],
+                        );
+                      },
+                    ),
             ),
-          );
-        },
+          ],
+        ),
       );
+    },
+  );
 
   /// Costruisce localmente l'elenco dei mentoraggi disponibili al mentee.
   Widget _elencoMentoraggi() => Card(
-        margin: EdgeInsets.zero,
-        clipBehavior: Clip.antiAlias,
-        child: ListView.separated(
-          itemCount: controller.percorsi.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final percorso = controller.percorsi[index];
-            final id = percorso.mentoraggio['id']?.toString() ?? '';
-            return ListTile(
-              selected: id == controller.selezionato?.mentoraggio['id']?.toString(),
-              title: Text(
-                percorso.insegnamento['insegnamento']?.toString() ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: Text(
-                '${percorso.mentoraggio['anno_accademico'] ?? ''}'
-                '${percorso.annoCorrente ? ' · corrente' : ' · storico'}',
-              ),
-              onTap: () => controller.seleziona(percorso),
-            );
-          },
-        ),
-      );
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    child: ListView.separated(
+      itemCount: controller.percorsi.length,
+      separatorBuilder: (_, _) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final percorso = controller.percorsi[index];
+        final id = percorso.mentoraggio['id']?.toString() ?? '';
+        return ListTile(
+          selected: id == controller.selezionato?.mentoraggio['id']?.toString(),
+          title: Text(
+            percorso.insegnamento['insegnamento']?.toString() ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(
+            '${percorso.mentoraggio['anno_accademico'] ?? ''}'
+            '${percorso.annoCorrente ? ' · corrente' : ' · storico'}',
+          ),
+          onTap: () => controller.seleziona(percorso),
+        );
+      },
+    ),
+  );
 
   /// Costruisce il dettaglio del mentoraggio selezionato.
   ///
@@ -215,7 +217,9 @@ class _MenteePageState extends State<MenteePage> {
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Insegnamento'),
-          subtitle: Text(percorso.insegnamento['insegnamento']?.toString() ?? ''),
+          subtitle: Text(
+            percorso.insegnamento['insegnamento']?.toString() ?? '',
+          ),
         ),
         if (!percorso.annoCorrente)
           const ListTile(
@@ -227,7 +231,10 @@ class _MenteePageState extends State<MenteePage> {
             ),
           ),
         const Divider(),
-        Text('Team di mentoraggio', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Team di mentoraggio',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         ...percorso.mentori.map(
           (mentore) => ListTile(
             leading: const Icon(Icons.person_outline),
@@ -259,7 +266,8 @@ class _MenteePageState extends State<MenteePage> {
 
         final campi = tabella.campi
             .where(
-              (campo) => campo.visibilePer(partecipante: true) &&
+              (campo) =>
+                  campo.visibilePer(partecipante: true) &&
                   valori.containsKey(campo.nome),
             )
             .toList(growable: false);
@@ -271,7 +279,9 @@ class _MenteePageState extends State<MenteePage> {
 
         campi.sort((a, b) {
           final confronto = posizione(a.nome).compareTo(posizione(b.nome));
-          return confronto != 0 ? confronto : a.etichetta.compareTo(b.etichetta);
+          return confronto != 0
+              ? confronto
+              : a.etichetta.compareTo(b.etichetta);
         });
 
         return Column(
@@ -310,11 +320,8 @@ class _MenteePageState extends State<MenteePage> {
     return SelectableText(testo.trim().isEmpty ? '—' : testo);
   }
 
-
   /// Gestisce l’operazione interna “link pdf” della pagina.
-  List<Widget> _linkPdf(
-    Map<String, dynamic> mentoraggio,
-  ) {
+  List<Widget> _linkPdf(Map<String, dynamic> mentoraggio) {
     final valore =
         mentoraggio['scheda_sintesi_pdf_url']?.toString().trim() ?? '';
 
@@ -330,9 +337,7 @@ class _MenteePageState extends State<MenteePage> {
         child: ListTile(
           leading: const Icon(Icons.description_outlined),
           title: const Text('Scheda di sintesi'),
-          subtitle: Text(
-            nomeFile.isEmpty ? 'Documento disponibile' : nomeFile,
-          ),
+          subtitle: Text(nomeFile.isEmpty ? 'Documento disponibile' : nomeFile),
           trailing: const Icon(Icons.open_in_new),
           onTap: () => _apriPdf(valore),
         ),
@@ -352,7 +357,9 @@ class _MenteePageState extends State<MenteePage> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossibile aprire la scheda di sintesi.')),
+        const SnackBar(
+          content: Text('Impossibile aprire la scheda di sintesi.'),
+        ),
       );
     }
   }
@@ -374,7 +381,9 @@ class _MenteePageState extends State<MenteePage> {
       await controller.salva(valori);
     } on AppException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.messaggio)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.messaggio)));
     }
   }
 }

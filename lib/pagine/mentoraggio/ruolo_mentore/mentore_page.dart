@@ -26,29 +26,29 @@ class _MentorePageState extends State<MentorePage> {
   ///
   /// La lista è indipendente da Mentee e dalla maschera di modifica.
   static const _ordineVisualizzazione = <String>[
-      'data_inizio',
-      'data_fine',
-      'giorni_orari_lezioni',
-      'sede',
-      'numero_studenti',
-      'svolgimento',
-      'note',
-      'stato_mentoraggio',
-      'stato',
-      'osservazioni_aula',
-      'data_visita_1',
-      'data_visita_2',
-      'data_visita_3',
-      'data_visita_4',
-      'osservazioni_focus_group',
-      'data_focus_group',
-      'data_incontro_finale',
-      'scheda_sintesi',
-      'data_invio_scheda',
-      'azioni_miglioramento',
-      'anno_accademico',
-      'link_questionario',
-    ];
+    'data_inizio',
+    'data_fine',
+    'giorni_orari_lezioni',
+    'sede',
+    'numero_studenti',
+    'svolgimento',
+    'note',
+    'stato_mentoraggio',
+    'stato',
+    'osservazioni_aula',
+    'data_visita_1',
+    'data_visita_2',
+    'data_visita_3',
+    'data_visita_4',
+    'osservazioni_focus_group',
+    'data_focus_group',
+    'data_incontro_finale',
+    'scheda_sintesi',
+    'data_invio_scheda',
+    'azioni_miglioramento',
+    'anno_accademico',
+    'link_questionario',
+  ];
 
   static const configurazione = ConfigurazionePaginaDinamica(
     tabella: 'mentoraggi',
@@ -87,9 +87,7 @@ class _MentorePageState extends State<MentorePage> {
       'giorni_orari_lezioni': PersonalizzazioneCampo(
         modificabilePartecipante: false,
       ),
-      'data_invio_scheda': PersonalizzazioneCampo(
-        solaLettura: true,
-      ),
+      'data_invio_scheda': PersonalizzazioneCampo(solaLettura: true),
       'scheda_sintesi_pdf_url': PersonalizzazioneCampo(nascosto: true),
     },
   );
@@ -97,8 +95,8 @@ class _MentorePageState extends State<MentorePage> {
   late final MentoreController controller;
   late final QuestionarioPubblicoController questionariController;
 
-  Iterable<PercorsoMentore> get _percorsiPrecedenti => controller.percorsi
-      .where((percorso) => !percorso.annoCorrente);
+  Iterable<PercorsoMentore> get _percorsiPrecedenti =>
+      controller.percorsi.where((percorso) => !percorso.annoCorrente);
 
   /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
@@ -159,9 +157,9 @@ class _MentorePageState extends State<MentorePage> {
                         }
                         return Column(
                           children: <Widget>[
-                            Expanded(child: elenco),
+                            Expanded(flex: 1, child: elenco),
                             const Divider(height: 20),
-                            Expanded(child: dettaglio),
+                            Expanded(flex: 2, child: dettaglio),
                           ],
                         );
                       },
@@ -328,10 +326,7 @@ class _MentorePageState extends State<MentorePage> {
   /// Crea una riga informativa standard del dettaglio Mentore.
   Widget _rigaInformazione(String etichetta, String valore) => ListTile(
     contentPadding: EdgeInsets.zero,
-    title: Text(
-      etichetta,
-      style: const TextStyle(fontWeight: FontWeight.bold),
-    ),
+    title: Text(etichetta, style: const TextStyle(fontWeight: FontWeight.bold)),
     subtitle: Text(valore.trim().isEmpty ? '—' : valore),
   );
 
@@ -347,7 +342,8 @@ class _MentorePageState extends State<MentorePage> {
         );
         final campi = tabella.campi
             .where(
-              (campo) => campo.visibilePer(partecipante: true) &&
+              (campo) =>
+                  campo.visibilePer(partecipante: true) &&
                   valori.containsKey(campo.nome),
             )
             .toList(growable: false);
@@ -359,7 +355,9 @@ class _MentorePageState extends State<MentorePage> {
 
         campi.sort((a, b) {
           final confronto = posizione(a.nome).compareTo(posizione(b.nome));
-          return confronto != 0 ? confronto : a.etichetta.compareTo(b.etichetta);
+          return confronto != 0
+              ? confronto
+              : a.etichetta.compareTo(b.etichetta);
         });
 
         return Column(
@@ -397,7 +395,6 @@ class _MentorePageState extends State<MentorePage> {
     }
     return SelectableText(testo.trim().isEmpty ? '—' : testo);
   }
-
 
   /// Gestisce l’operazione interna “modifica” della pagina.
   Future<void> _modifica() async {

@@ -12,11 +12,12 @@ class QuestionarioInternoDialog extends StatefulWidget {
 
   final String eventoId;
   final Future<Map<String, dynamic>?> Function(String eventoId)
-      caricaQuestionario;
+  caricaQuestionario;
   final Future<String?> Function({
     required String questionarioId,
     required Map<String, dynamic> risposte,
-  }) inviaQuestionario;
+  })
+  inviaQuestionario;
 
   @override
   State<QuestionarioInternoDialog> createState() =>
@@ -101,22 +102,25 @@ class _QuestionarioInternoDialogState extends State<QuestionarioInternoDialog> {
     return AlertDialog(
       title: Text(questionario['titolo']?.toString() ?? 'Questionario'),
       content: SizedBox(
-        width: 680,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final domanda in domande) ...[
-                CampoQuestionario(
-                  domanda: domanda,
-                  valore: _risposte[domanda['id'].toString()],
-                  onChanged: (valore) => setState(
-                    () => _risposte[domanda['id'].toString()] = valore,
+        width: double.infinity,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final domanda in domande) ...[
+                  CampoQuestionario(
+                    domanda: domanda,
+                    valore: _risposte[domanda['id'].toString()],
+                    onChanged: (valore) => setState(
+                      () => _risposte[domanda['id'].toString()] = valore,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 16),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
