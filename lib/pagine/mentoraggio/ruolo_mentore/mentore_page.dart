@@ -98,6 +98,16 @@ class _MentorePageState extends State<MentorePage> {
   Iterable<PercorsoMentore> get _percorsiPrecedenti =>
       controller.percorsi.where((percorso) => !percorso.annoCorrente);
 
+  Iterable<PercorsoMentore> get _percorsiPrecedentiConScheda =>
+      _percorsiPrecedenti.where(
+        (percorso) =>
+            percorso.mentoraggio['scheda_sintesi_pdf_url']
+                ?.toString()
+                .trim()
+                .isNotEmpty ??
+            false,
+      );
+
   /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
   void initState() {
@@ -290,26 +300,19 @@ class _MentorePageState extends State<MentorePage> {
           solaLettura: !percorso.annoCorrente,
           onAggiornato: controller.carica,
         ),
-        if (percorso.annoCorrente && _percorsiPrecedenti.isNotEmpty) ...[
+        if (percorso.annoCorrente &&
+            _percorsiPrecedentiConScheda.isNotEmpty) ...[
           const Divider(height: 40),
           Text(
             'Percorsi precedenti',
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
-          for (final storico in _percorsiPrecedenti) ...[
+          for (final storico in _percorsiPrecedentiConScheda) ...[
             Text(
               '${storico.insegnamento['insegnamento'] ?? ''} · '
               '${storico.mentoraggio['anno_accademico'] ?? ''}',
               style: Theme.of(context).textTheme.titleMedium,
-            ),
-            _rigaInformazione(
-              'Scheda di sintesi',
-              storico.mentoraggio['scheda_sintesi']?.toString() ?? '',
-            ),
-            _rigaInformazione(
-              'Azioni di miglioramento',
-              storico.mentoraggio['azioni_miglioramento']?.toString() ?? '',
             ),
             _SchedaSintesiFileCard(
               mentoraggio: storico.mentoraggio,
