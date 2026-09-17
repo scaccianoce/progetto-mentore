@@ -102,6 +102,7 @@ class _ContattiPageState extends State<ContattiPage> {
                         final elenco = _elencoContatti();
                         final dettaglio = Card(
                           margin: EdgeInsets.zero,
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
                           child: selezionato == null
                               ? const Center(child: Text('Seleziona un contatto.'))
                               : _dettaglioContatto(selezionato),
@@ -133,6 +134,7 @@ class _ContattiPageState extends State<ContattiPage> {
 
   /// Costruisce localmente l'elenco dei contatti filtrati.
   Widget _elencoContatti() => Card(
+    color: Theme.of(context).colorScheme.surfaceContainerLow, // elenco
     margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
     child: ListView.separated(
@@ -156,9 +158,11 @@ class _ContattiPageState extends State<ContattiPage> {
   );
 
   /// Costruisce il dettaglio del contatto con ordine autonomo della pagina.
-  Widget _dettaglioContatto(Map<String, dynamic> valori) => ListView(
-    padding: const EdgeInsets.all(24),
-    children: <Widget>[
+  Widget _dettaglioContatto(Map<String, dynamic> valori) => ColoredBox(
+    color: Theme.of(context).colorScheme.surfaceContainerHigh,
+    child: ListView(
+      padding: const EdgeInsets.all(24),
+      children: <Widget>[
       Text(
         '${valori['nome'] ?? ''} ${valori['cognome'] ?? ''}'.trim(),
         style: Theme.of(context).textTheme.headlineSmall,
@@ -209,6 +213,7 @@ class _ContattiPageState extends State<ContattiPage> {
           );
         },
       ),
-    ],
+      ],
+    ),
   );
 }

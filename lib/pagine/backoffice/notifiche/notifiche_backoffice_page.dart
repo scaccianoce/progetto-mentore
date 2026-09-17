@@ -7,6 +7,45 @@ import '../../../app/app_core.dart';
 import '../../../supporto/utilita.dart';
 import 'notifiche_backoffice_controller.dart';
 
+String _etichettaTipoEvento(String? valore) {
+  return switch (valore) {
+    'insert' || 'nuovo_inserimento' => 'Nuovo inserimento',
+    'update' || 'aggiornamento' => 'Aggiornamento',
+    'data' || 'reminder_prima_data' => 'Reminder prima della data',
+    'reminder_giorno_data' => 'Reminder il giorno stesso',
+    'reminder_dopo_data' => 'Reminder dopo la data',
+    'programmata' => 'Programmata',
+    _ => (valore ?? '').trim().isEmpty ? 'Manuale' : valore!,
+  };
+}
+
+String _etichettaDestinatari(String? valore, {String? annoPreparazione}) {
+  return switch (valore) {
+    'tutti' => 'Tutti',
+    'participant' || 'partecipanti' => annoPreparazione == null
+        ? 'Partecipanti'
+        : 'Partecipanti · $annoPreparazione',
+    'mentor' => 'Mentori',
+    'mentee' => 'Mentee',
+    'senior' => 'Coordinatori',
+    'coordinatori' => 'Coordinatori',
+    'amministratori' => 'Amministratori',
+    'mentor_senior' => 'Mentori e coordinatori',
+    'mentor_senior_mentee' => 'Mentori, coordinatori e mentee',
+    'iscritti_evento' => 'Iscritti all\'evento',
+    'iscritti_house_of_mentore' => 'Iscritti House of Mentore',
+    'manuale' => 'Persone selezionate',
+    _ => valore ?? '',
+  };
+}
+
+String _etichettaCanali({required bool inviaPush, required bool inviaEmail}) {
+  if (inviaPush && inviaEmail) return 'Push + Email';
+  if (inviaPush) return 'Solo push';
+  if (inviaEmail) return 'Solo email';
+  return 'Nessun canale';
+}
+
 
 /// Backoffice notifiche riservato a owner e organizer.
 ///
@@ -185,12 +224,16 @@ class _NotificheMessaggiBackofficePageState
                   itemBuilder: (context, index) {
                     final m = _messaggi[index];
                     final modificabile = _programmatoModificabile(m);
+                    final inviaPush = m['invia_push'] != false;
+                    final inviaEmail = m['invia_email'] == true;
                     return Card(
                       child: ListTile(
                         leading: const Icon(Icons.notifications_outlined),
                         title: Text(m['titolo']?.toString() ?? 'Notifica'),
                         subtitle: Text(
-                          '${m['anno_accademico'] ?? ''} · ${m['destinatari'] ?? ''} · '
+                          '${m['anno_accademico'] ?? ''} · '
+                          '${_etichettaDestinatari(m['destinatari']?.toString())} · '
+                          '${_etichettaCanali(inviaPush: inviaPush, inviaEmail: inviaEmail)} · '
                           '${m['stato'] ?? ''}${m['programmata_per'] == null ? '' : ' · ${_formattaValoreData(m['programmata_per'])}'}',
                         ),
                         trailing: Wrap(
@@ -443,7 +486,8 @@ class _DestinatariMessaggioDialogState
                       itemBuilder: (context, index) {
                         final d = _destinatari[index];
                         final nome = '${d['cognome'] ?? ''} ${d['nome'] ?? ''}'.trim();
-                        final errore = d['errore']?.toString().trim();
+                        final pushErrore = d['push_errore']?.toString().trim();
+                        final emailErrore = d['email_errore']?.toString().trim();
                         return ListTile(
                           leading: CircleAvatar(child: Text('${index + 1}')),
                           title: Text(nome.isEmpty ? d['user_id']?.toString() ?? 'Utente' : nome),
@@ -453,15 +497,23 @@ class _DestinatariMessaggioDialogState
                               if ((d['email_unipa']?.toString() ?? '').isNotEmpty)
                                 Text(d['email_unipa'].toString()),
                               Text(
-                                'Stato: ${d['stato'] ?? ''}'
-                                '${d['inviato_at'] == null ? '' : ' · inviato ${_formattaDataDb(d['inviato_at'])}'}'
-                                '${d['letto_at'] == null ? '' : ' · letto ${_formattaDataDb(d['letto_at'])}'}',
+                                'Push: ${d['push_stato'] ?? d['stato'] ?? ''}'
+                                '${d['push_inviata_at'] == null ? '' : ' · inviato ${_formattaDataDb(d['push_inviata_at'])}'}',
                               ),
-                              if (errore != null && errore.isNotEmpty)
-                                Text('Errore: $errore'),
+                              Text(
+                                'Email: ${d['email_stato'] ?? 'non_richiesta'}'
+                                '${d['email_programmata_per'] == null ? '' : ' · prevista ${_formattaDataDb(d['email_programmata_per'])}'}'
+                                '${d['email_inviata_at'] == null ? '' : ' · inviata ${_formattaDataDb(d['email_inviata_at'])}'}',
+                              ),
+                              if (d['letto_at'] != null)
+                                Text('Letta il ${_formattaDataDb(d['letto_at'])}'),
+                              if (pushErrore != null && pushErrore.isNotEmpty)
+                                Text('Errore push: $pushErrore'),
+                              if (emailErrore != null && emailErrore.isNotEmpty)
+                                Text('Errore email: $emailErrore'),
                             ],
                           ),
-                          trailing: _iconaStato(d['stato']?.toString()),
+                          trailing: _iconaStato(d['push_stato']?.toString()),
                         );
                       },
                     ),
@@ -522,8 +574,10 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
   final _messaggio = TextEditingController();
   String? _destinatari;
   String? _riferimentoId;
-  String? _anno;
+  String? _annoPreparazione;
   DateTime? _programmataPer;
+  bool _inviaPush = true;
+  bool _inviaEmail = false;
   List<Map<String, dynamic>> _opzioni = const [];
   final Set<String> _utentiManuali = <String>{};
   bool _caricamentoOpzioni = false;
@@ -532,11 +586,17 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
 
   bool get _modifica => widget.messaggioEsistente != null;
 
-  List<String> get _tipiDestinatari => widget.schema
+  List<String> get _tipiDestinatari {
+    final valori = widget.schema
           .tabella('notifiche_messaggi')
           ?.campo('destinatari')
           ?.valoriScelta ??
-      const <String>[];
+        const <String>[];
+    final consentiti = valori
+        .where((v) => v != 'anno_accademico' && v != 'relazionale')
+        .toList(growable: false);
+    return consentiti;
+  }
 
   /// Inizializza lo stato della pagina e avvia le operazioni iniziali necessarie.
   @override
@@ -547,6 +607,8 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
       _titolo.text = esistente['titolo']?.toString() ?? '';
       _messaggio.text = esistente['messaggio']?.toString() ?? '';
       _destinatari = esistente['destinatari']?.toString();
+      _inviaPush = esistente['invia_push'] != false;
+      _inviaEmail = esistente['invia_email'] == true;
       _programmataPer = DateTime.tryParse(
         esistente['programmata_per']?.toString() ?? '',
       )?.toLocal();
@@ -554,7 +616,6 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
       final config = _configurazione(esistente['destinatari_configurazione']);
       _riferimentoId =
           config['evento_id']?.toString() ?? config['house_of_mentore_id']?.toString();
-      _anno = config['anno_accademico']?.toString();
       final utenti = config['user_ids'];
       if (utenti is List) {
         _utentiManuali.addAll(utenti.map((e) => e.toString()));
@@ -563,6 +624,24 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _caricaOpzioni(_destinatari);
       });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _caricaAnnoPreparazione();
+    });
+  }
+
+  Future<void> _caricaAnnoPreparazione() async {
+    try {
+      final opzioni = await widget.controller.caricaOpzioniDestinatari('anno_accademico');
+      final preparazione = opzioni.cast<Map<String, dynamic>?>().whereType<Map<String, dynamic>>().firstWhere(
+            (r) => r['stato']?.toString() == 'preparazione',
+            orElse: () => const <String, dynamic>{},
+          );
+      final codice = preparazione['codice']?.toString();
+      if (!mounted) return;
+      setState(() => _annoPreparazione = (codice == null || codice.isEmpty) ? null : codice);
+    } catch (_) {
+      // Etichetta opzionale: non blocca la compilazione del dialog.
     }
   }
 
@@ -612,13 +691,22 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
                 initialValue: _tipiDestinatari.contains(_destinatari) ? _destinatari : null,
                 decoration: const InputDecoration(labelText: 'Destinatari'),
                 items: _tipiDestinatari
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(
+                          _etichettaDestinatari(
+                            v,
+                            annoPreparazione: _annoPreparazione,
+                          ),
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) async {
                   setState(() {
                     _destinatari = v;
                     _riferimentoId = null;
-                    _anno = null;
                     _utentiManuali.clear();
                     _opzioni = const [];
                   });
@@ -629,8 +717,21 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
               if (_destinatari == 'iscritti_evento') _dropdownRiferimento('Evento'),
               if (_destinatari == 'iscritti_house_of_mentore')
                 _dropdownRiferimento('House of Mentore'),
-              if (_destinatari == 'anno_accademico') _dropdownAnno(),
               if (_destinatari == 'manuale') _selezioneManuale(),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Invia notifica push'),
+                value: _inviaPush,
+                onChanged: (v) => setState(() => _inviaPush = v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Invia email'),
+                subtitle: const Text('L\'email segue la coda giornaliera configurata.'),
+                value: _inviaEmail,
+                onChanged: (v) => setState(() => _inviaEmail = v),
+              ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Invio'),
@@ -697,23 +798,6 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
           )
           .toList(),
       onChanged: (v) => setState(() => _riferimentoId = v),
-    );
-  }
-
-  /// Gestisce l’operazione interna “dropdown anno” della pagina.
-  Widget _dropdownAnno() {
-    return DropdownButtonFormField<String>(
-      initialValue: _opzioni.any((r) => r['codice']?.toString() == _anno) ? _anno : null,
-      decoration: const InputDecoration(labelText: 'Anno accademico'),
-      items: _opzioni
-          .map(
-            (r) => DropdownMenuItem<String>(
-              value: r['codice'].toString(),
-              child: Text(r['codice'].toString()),
-            ),
-          )
-          .toList(),
-      onChanged: (v) => setState(() => _anno = v),
     );
   }
 
@@ -802,12 +886,12 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
       setState(() => _errore = 'Seleziona il riferimento.');
       return;
     }
-    if (_destinatari == 'anno_accademico' && _anno == null) {
-      setState(() => _errore = 'Seleziona l’anno accademico.');
-      return;
-    }
     if (_destinatari == 'manuale' && _utentiManuali.isEmpty) {
       setState(() => _errore = 'Seleziona almeno una persona attiva.');
+      return;
+    }
+    if (!_inviaPush && !_inviaEmail) {
+      setState(() => _errore = 'Seleziona almeno un canale di invio.');
       return;
     }
 
@@ -818,9 +902,6 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
         break;
       case 'iscritti_house_of_mentore':
         config['house_of_mentore_id'] = _riferimentoId;
-        break;
-      case 'anno_accademico':
-        config['anno_accademico'] = _anno;
         break;
       case 'manuale':
         config['user_ids'] = _utentiManuali.toList();
@@ -837,6 +918,8 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
         'messaggio': messaggio,
         'destinatari': _destinatari,
         'destinatari_configurazione': jsonDecode(jsonEncode(config)),
+        'invia_push': _inviaPush,
+        'invia_email': _inviaEmail,
         'programmata_per': _programmataPer?.toUtc().toIso8601String(),
         'stato': _programmataPer == null ? 'da_inviare' : 'programmato',
       };
@@ -1074,7 +1157,7 @@ class _NotificheRegoleBackofficePageState
   /// Gestisce l’operazione interna “descrizione regola” della pagina.
   String _descrizioneRegola(Map<String, dynamic> r) {
     final parti = <String>[
-      r['tipo_attivazione']?.toString() ?? '',
+      _etichettaTipoEvento(r['tipo_attivazione']?.toString()),
       r['tabella']?.toString() ?? '',
     ];
     final campo = r['campo_data']?.toString();
@@ -1086,7 +1169,7 @@ class _NotificheRegoleBackofficePageState
     if (dataProgrammata != null && dataProgrammata.isNotEmpty) {
       parti.add('invio $dataProgrammata');
     }
-    parti.add('→ ${r['destinatari'] ?? ''}');
+    parti.add('→ ${_etichettaDestinatari(r['destinatari']?.toString())}');
     return parti.where((v) => v.isNotEmpty).join(' · ');
   }
 
@@ -1391,7 +1474,12 @@ class _RegolaDialogState extends State<_RegolaDialog> {
                 initialValue: _tipi.contains(_tipo) ? _tipo : null,
                 decoration: const InputDecoration(labelText: 'Tipo attivazione'),
                 items: _tipi
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(_etichettaTipoEvento(v)),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() {
                   _tipo = v;
@@ -1461,7 +1549,12 @@ class _RegolaDialogState extends State<_RegolaDialog> {
                     : null,
                 decoration: const InputDecoration(labelText: 'Destinatari'),
                 items: _destinatariDisponibili
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                    .map(
+                      (v) => DropdownMenuItem(
+                        value: v,
+                        child: Text(_etichettaDestinatari(v)),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() {
                   _destinatari = v;

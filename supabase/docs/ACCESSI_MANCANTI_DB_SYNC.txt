@@ -1,0 +1,37 @@
+SYNC STRUTTURA DB - ACCESSI E PREREQUISITI MANCANTI
+===================================================
+
+Data verifica: 2026-09-15
+Progetto: yjcoldhertzaaypkyjlj (TEST_db_mentore)
+
+COSA E' STATO POSSIBILE FARE
+----------------------------
+1) Link CLI Supabase al progetto remoto.
+2) Query read-only della struttura public tramite:
+   supabase gen types typescript --linked --schema public
+3) Aggiornamento snapshot locale:
+   source-inventory/Database.types.live.ts
+
+COSA NON E' STATO POSSIBILE FARE IN AUTOMATICO
+----------------------------------------------
+1) Eseguire dump schema SQL completo con:
+   supabase db dump --linked ...
+   Motivo: Docker/Podman non disponibile nel sistema locale.
+
+2) Rigenerare integralmente i CSV legacy in source-inventory con metadati completi
+   (constraint, indici, trigger, policy RLS, grant, cron, extensions, bucket)
+   senza dump SQL o connessione Postgres diretta.
+
+COSA DEVI AGGIORNARE TU (SE VUOI COMPLETARE AL 100%)
+----------------------------------------------------
+Opzione A (consigliata): installa Docker Desktop o Podman e poi riesegui:
+- supabase db dump --linked --schema public --file /tmp/public_schema.sql
+
+Opzione B: forniscimi una connessione Postgres diretta leggibile
+(host, porta, database, utente e password) per eseguire query catalogo
+(information_schema/pg_catalog) e rigenerare i CSV completi.
+
+NOTA DI SICUREZZA
+-----------------
+Nessun secret e' stato stampato o versionato in questo sync.
+Le operazioni eseguite sono state esclusivamente read-only.

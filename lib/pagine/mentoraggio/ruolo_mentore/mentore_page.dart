@@ -154,6 +154,7 @@ class _MentorePageState extends State<MentorePage> {
                         final elenco = _elencoMentoraggi();
                         final dettaglio = Card(
                           margin: EdgeInsets.zero,
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
                           child: _dettaglio(),
                         );
                         if (constraints.maxWidth >= 800) {
@@ -183,6 +184,7 @@ class _MentorePageState extends State<MentorePage> {
 
   /// Costruisce localmente l'elenco dei mentoraggi assegnati al mentore.
   Widget _elencoMentoraggi() => Card(
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
     margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
     child: ListView.separated(
@@ -217,9 +219,11 @@ class _MentorePageState extends State<MentorePage> {
       return const Center(child: Text('Seleziona un mentoraggio.'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: <Widget>[
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
         LayoutBuilder(
           builder: (context, constraints) {
             final titolo = Text(
@@ -322,7 +326,8 @@ class _MentorePageState extends State<MentorePage> {
             const Divider(height: 32),
           ],
         ],
-      ],
+        ],
+      ),
     );
   }
 

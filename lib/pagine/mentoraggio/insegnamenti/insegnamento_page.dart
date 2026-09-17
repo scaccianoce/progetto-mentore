@@ -381,6 +381,7 @@ class _InsegnamentoPageState
 
     if (_erroreScelta != null) {
       return Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Padding(
           padding:
               const EdgeInsets.all(16),
@@ -410,6 +411,7 @@ class _InsegnamentoPageState
         stato.partecipazioneConfermata &&
         !stato.haMentoraggio) {
       return Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -443,6 +445,7 @@ class _InsegnamentoPageState
     if (stato.nonRichiesto &&
         !stato.haMentoraggio) {
       return Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Padding(
           padding:
               const EdgeInsets.all(16),
@@ -482,6 +485,7 @@ class _InsegnamentoPageState
       );
 
       return Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Padding(
           padding:
               const EdgeInsets.all(16),
@@ -556,6 +560,7 @@ class _InsegnamentoPageState
     if (!stato.puoSelezionare &&
         !stato.puoCreare) {
       return Card(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         child: Padding(
           padding:
               const EdgeInsets.all(16),
@@ -591,6 +596,7 @@ class _InsegnamentoPageState
     // ----------------------------------------------------------
 
     return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       child: Padding(
         padding:
             const EdgeInsets.all(16),
@@ -842,6 +848,7 @@ class _InsegnamentoPageState
     final mentoraggioId = mentoraggio['id']?.toString() ?? '';
 
     return Card(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
       margin: const EdgeInsets.only(top: 12),
       child: ExpansionTile(
         leading: const Icon(Icons.timeline_outlined),
@@ -880,7 +887,7 @@ class _InsegnamentoPageState
                   else ...[
                     Card(
                       elevation: 0,
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
+                      color: Theme.of(context).colorScheme.surfaceContainer,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
                         child: Column(

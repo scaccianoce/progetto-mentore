@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import nodemailer from 'npm:nodemailer@6'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -122,6 +123,21 @@ type Chiamante =
   | { tipo: 'cron' }
   | { tipo: 'utente'; userId: string }
 
+type SmtpConfig = {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  pass: string
+  fromEmail: string
+  replyTo?: string
+}
+
+type FcmConfig = {
+  accessToken: string
+  projectId: string
+}
+
 async function verificaChiamante(
   req: Request,
   supabaseAdmin: ReturnType<typeof createClient>,
@@ -222,6 +238,65 @@ async function inviaFcm(
   return { ok: response.ok, status: response.status, result }
 }
 
+function parseBool(value: string | undefined, fallback: boolean): boolean {
+  if (!value) return fallback
+  const normalized = value.trim().toLowerCase()
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false
+  return fallback
+}
+
+function parseSmtpConfig(): SmtpConfig | null {
+  const host = Deno.env.get('SMTP_HOST')?.trim() || 'smtp.aruba.it'
+  const portRaw = Deno.env.get('SMTP_PORT')?.trim() || '465'
+  const secure = parseBool(Deno.env.get('SMTP_SECURE'), portRaw === '465')
+  const user = Deno.env.get('SMTP_USER')?.trim()
+  const pass = Deno.env.get('SMTP_PASS')?.trim()
+  const fromEmail = Deno.env.get('SMTP_FROM_EMAIL')?.trim()
+  const replyTo = Deno.env.get('SMTP_REPLY_TO')?.trim()
+
+  const port = Number(portRaw)
+  if (!Number.isFinite(port) || port <= 0) return null
+  if (!user || !pass || !fromEmail) return null
+
+  return {
+    host,
+    port,
+    secure,
+    user,
+    pass,
+    fromEmail,
+    replyTo: replyTo || undefined,
+  }
+}
+
+async function inviaSmtpEmail(
+  transporter: any,
+  config: SmtpConfig,
+  to: string,
+  subject: string,
+  textBody: string,
+) {
+  const payload: Record<string, unknown> = {
+    from: config.fromEmail,
+    to,
+    subject,
+    text: textBody,
+  }
+  if (config.replyTo) payload.replyTo = config.replyTo
+
+  try {
+    const result = await transporter.sendMail(payload)
+    return { ok: true, status: 200, result }
+  } catch (error) {
+    return {
+      ok: false,
+      status: 500,
+      result: { message: errorMessage(error) },
+    }
+  }
+}
+
 async function generaDestinatari(
   supabaseAdmin: ReturnType<typeof createClient>,
   messaggioId: string,
@@ -234,11 +309,160 @@ async function generaDestinatari(
   return Number(data ?? 0)
 }
 
+async function pianificaEmailMessaggio(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  messaggioId: string,
+) {
+  const { data, error } = await supabaseAdmin.rpc(
+    'notifiche_email_pianifica_messaggio',
+    {
+      p_messaggio_id: messaggioId,
+      p_limite_giornaliero: 90,
+    },
+  )
+  if (error) throw error
+
+  const oggi = new Date().toISOString().slice(0, 10)
+  const { count, error: countError } = await supabaseAdmin
+    .from('notifiche_destinatari')
+    .select('*', { count: 'exact', head: true })
+    .eq('messaggio_id', messaggioId)
+    .eq('email_stato', 'in_coda')
+    .lte('email_programmata_per', oggi)
+
+  if (countError) throw countError
+
+  return {
+    pianificate: Number(data ?? 0),
+    pronteOggi: Number(count ?? 0),
+  }
+}
+
+async function inviaEmailMessaggio(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  messaggio: Record<string, any>,
+  smtpConfig: SmtpConfig | null,
+) {
+  const oggi = new Date().toISOString().slice(0, 10)
+  const nowIso = new Date().toISOString()
+
+  const { data: candidati, error: candidatiError } = await supabaseAdmin
+    .from('notifiche_destinatari')
+    .select('id, user_id, email_tentativi')
+    .eq('messaggio_id', messaggio.id)
+    .eq('email_stato', 'in_coda')
+    .lte('email_programmata_per', oggi)
+
+  if (candidatiError) throw candidatiError
+
+  const userIds = [
+    ...new Set((candidati ?? []).map((d: { user_id: string }) => d.user_id)),
+  ]
+  const emailPerUtente = new Map<string, string>()
+
+  if (userIds.length > 0) {
+    const { data: anagrafiche, error: anagraficheError } = await supabaseAdmin
+      .from('anagrafica')
+      .select('user_id, email_unipa')
+      .in('user_id', userIds)
+    if (anagraficheError) throw anagraficheError
+
+    for (const r of anagrafiche ?? []) {
+      const email = r.email_unipa?.toString().trim()
+      if (email) emailPerUtente.set(r.user_id, email)
+    }
+  }
+
+  let inviate = 0
+  let fallite = 0
+  let senzaEmail = 0
+  const transporter = smtpConfig
+    ? nodemailer.createTransport({
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        secure: smtpConfig.secure,
+        auth: {
+          user: smtpConfig.user,
+          pass: smtpConfig.pass,
+        },
+      })
+    : null
+
+  for (const candidato of candidati ?? []) {
+    const tentativi = Number(candidato.email_tentativi ?? 0)
+    const emailDestinatario = emailPerUtente.get(candidato.user_id)
+
+    if (!emailDestinatario) {
+      senzaEmail++
+      await supabaseAdmin
+        .from('notifiche_destinatari')
+        .update({
+          email_stato: 'fallita',
+          email_tentativi: tentativi + 1,
+          email_errore: 'Email destinatario assente in anagrafica.',
+        })
+        .eq('id', candidato.id)
+      continue
+    }
+
+    if (!smtpConfig || !transporter) {
+      fallite++
+      await supabaseAdmin
+        .from('notifiche_destinatari')
+        .update({
+          email_stato: 'fallita',
+          email_tentativi: tentativi + 1,
+          email_errore: 'SMTP non configurato (SMTP_USER/SMTP_PASS/SMTP_FROM_EMAIL).',
+        })
+        .eq('id', candidato.id)
+      continue
+    }
+
+    const esito = await inviaSmtpEmail(
+      transporter,
+      smtpConfig,
+      emailDestinatario,
+      String(messaggio.titolo ?? 'Notifica'),
+      String(messaggio.messaggio ?? ''),
+    )
+
+    if (esito.ok) {
+      inviate++
+      await supabaseAdmin
+        .from('notifiche_destinatari')
+        .update({
+          email_stato: 'inviata',
+          email_tentativi: tentativi + 1,
+          email_inviata_at: nowIso,
+          email_errore: null,
+        })
+        .eq('id', candidato.id)
+    } else {
+      fallite++
+      await supabaseAdmin
+        .from('notifiche_destinatari')
+        .update({
+          email_stato: 'fallita',
+          email_tentativi: tentativi + 1,
+          email_errore: JSON.stringify(esito.result).slice(0, 4000),
+        })
+        .eq('id', candidato.id)
+    }
+  }
+
+  return {
+    pronte: (candidati ?? []).length,
+    inviate,
+    fallite,
+    senza_email: senzaEmail,
+  }
+}
+
 async function inviaMessaggio(
   supabaseAdmin: ReturnType<typeof createClient>,
-  accessToken: string,
-  serviceAccount: Record<string, string>,
   messaggio: Record<string, any>,
+  fcmConfig: FcmConfig | null,
+  smtpConfig: SmtpConfig | null,
 ) {
   if (
     messaggio.programmata_per &&
@@ -252,6 +476,95 @@ async function inviaMessaggio(
     String(messaggio.id),
   )
 
+  const inviaPush = messaggio.invia_push !== false
+  const inviaEmail = messaggio.invia_email === true
+
+  let emailPianificate = 0
+  let emailPronteOggi = 0
+  if (inviaEmail) {
+    const email = await pianificaEmailMessaggio(
+      supabaseAdmin,
+      String(messaggio.id),
+    )
+    emailPianificate = email.pianificate
+    emailPronteOggi = email.pronteOggi
+  }
+
+  const esitoEmail = inviaEmail
+    ? await inviaEmailMessaggio(supabaseAdmin, messaggio, smtpConfig)
+    : { pronte: 0, inviate: 0, fallite: 0, senza_email: 0 }
+
+  if (!inviaPush && !inviaEmail) {
+    await supabaseAdmin
+      .from('notifiche_messaggi')
+      .update({
+        stato: 'errore',
+        inviata_at: new Date().toISOString(),
+      })
+      .eq('id', messaggio.id)
+
+    return {
+      messaggio_id: messaggio.id,
+      destinatari_generati: destinatariGenerati,
+      inviati: 0,
+      errori: 1,
+      senza_dispositivo: 0,
+      esclusi_inattivi: 0,
+      email_pianificate: 0,
+      email_pronte_oggi: 0,
+      email_inviate: 0,
+      email_fallite: 0,
+      email_senza_indirizzo: 0,
+      stato: 'errore',
+      nota: 'Nessun canale abilitato (invia_push/invia_email).',
+    }
+  }
+
+  if (!inviaPush) {
+    await supabaseAdmin
+      .from('notifiche_destinatari')
+      .update({
+        push_stato: 'non_richiesta',
+        push_errore: null,
+      })
+      .eq('messaggio_id', messaggio.id)
+
+    const haErroriEmail = esitoEmail.fallite > 0 || esitoEmail.senza_email > 0
+    const haEmailPendenti = emailPianificate > esitoEmail.inviate
+    const stato = haErroriEmail
+      ? (esitoEmail.inviate > 0 ? 'parziale' : 'errore')
+      : (haEmailPendenti ? 'programmato' : 'inviato')
+    await supabaseAdmin
+      .from('notifiche_messaggi')
+      .update({
+        stato,
+        inviata_at: stato === 'inviato' ? new Date().toISOString() : null,
+      })
+      .eq('id', messaggio.id)
+
+    return {
+      messaggio_id: messaggio.id,
+      destinatari_generati: destinatariGenerati,
+      inviati: 0,
+      errori: 0,
+      senza_dispositivo: 0,
+      esclusi_inattivi: 0,
+      email_pianificate: emailPianificate,
+      email_pronte_oggi: emailPronteOggi,
+      email_inviate: esitoEmail.inviate,
+      email_fallite: esitoEmail.fallite,
+      email_senza_indirizzo: esitoEmail.senza_email,
+      stato,
+      nota: 'Canale push disattivato. Email processate via Resend.',
+    }
+  }
+
+  if (!fcmConfig) {
+    throw new Error(
+      'Push richiesto ma FIREBASE_SERVICE_ACCOUNT_JSON non disponibile o non valido.',
+    )
+  }
+
   await supabaseAdmin
     .from('notifiche_messaggi')
     .update({ stato: 'in_invio' })
@@ -259,13 +572,15 @@ async function inviaMessaggio(
 
   const { data: destinatari, error: destinatariError } = await supabaseAdmin
     .from('notifiche_destinatari')
-    .select('id, user_id, stato')
+    .select('id, user_id, push_stato')
     .eq('messaggio_id', messaggio.id)
-    .in('stato', ['da_inviare', 'errore', 'senza_dispositivo'])
+    .in('push_stato', ['da_inviare', 'fallita', 'senza_dispositivo'])
 
   if (destinatariError) throw destinatariError
 
-  const userIds = [...new Set((destinatari ?? []).map((d) => d.user_id))]
+  const userIds = [
+    ...new Set((destinatari ?? []).map((d: { user_id: string }) => d.user_id)),
+  ]
   const attivi = new Set<string>()
 
   if (userIds.length > 0) {
@@ -288,7 +603,12 @@ async function inviaMessaggio(
       esclusi++
       await supabaseAdmin
         .from('notifiche_destinatari')
-        .update({ stato: 'escluso_inattivo', errore: null })
+        .update({
+          stato: 'escluso_inattivo',
+          push_stato: 'esclusa',
+          errore: null,
+          push_errore: null,
+        })
         .eq('id', destinatario.id)
       continue
     }
@@ -305,7 +625,12 @@ async function inviaMessaggio(
       senzaDispositivo++
       await supabaseAdmin
         .from('notifiche_destinatari')
-        .update({ stato: 'senza_dispositivo', errore: null })
+        .update({
+          stato: 'senza_dispositivo',
+          push_stato: 'senza_dispositivo',
+          errore: null,
+          push_errore: null,
+        })
         .eq('id', destinatario.id)
       continue
     }
@@ -315,8 +640,8 @@ async function inviaMessaggio(
 
     for (const dispositivo of dispositivi) {
       const esito = await inviaFcm(
-        accessToken,
-        serviceAccount.project_id,
+        fcmConfig.accessToken,
+        fcmConfig.projectId,
         dispositivo.token,
         messaggio,
       )
@@ -345,8 +670,11 @@ async function inviaMessaggio(
         .from('notifiche_destinatari')
         .update({
           stato: 'inviato',
+          push_stato: 'inviata',
           inviato_at: new Date().toISOString(),
+          push_inviata_at: new Date().toISOString(),
           errore: null,
+          push_errore: null,
         })
         .eq('id', destinatario.id)
     } else {
@@ -355,7 +683,9 @@ async function inviaMessaggio(
         .from('notifiche_destinatari')
         .update({
           stato: 'errore',
+          push_stato: 'fallita',
           errore: erroriToken.join('\n').slice(0, 4000),
+          push_errore: erroriToken.join('\n').slice(0, 4000),
         })
         .eq('id', destinatario.id)
     }
@@ -364,8 +694,14 @@ async function inviaMessaggio(
   // Nessun destinatario effettivo: il processamento e comunque concluso.
   // Il dettaglio destinatari mostra chiaramente 0 righe.
   let stato = 'inviato'
-  if (errori > 0 || senzaDispositivo > 0) {
-    stato = inviati > 0 ? 'parziale' : 'errore'
+  const haErroriPush = errori > 0 || senzaDispositivo > 0
+  const haErroriEmail = esitoEmail.fallite > 0 || esitoEmail.senza_email > 0
+  const haEmailPendenti = emailPianificate > esitoEmail.inviate
+
+  if (haErroriPush || haErroriEmail) {
+    stato = (inviati > 0 || esitoEmail.inviate > 0) ? 'parziale' : 'errore'
+  } else if (haEmailPendenti) {
+    stato = 'programmato'
   }
 
   await supabaseAdmin
@@ -383,11 +719,16 @@ async function inviaMessaggio(
     errori,
     senza_dispositivo: senzaDispositivo,
     esclusi_inattivi: esclusi,
+    email_pianificate: emailPianificate,
+    email_pronte_oggi: emailPronteOggi,
+    email_inviate: esitoEmail.inviate,
+    email_fallite: esitoEmail.fallite,
+    email_senza_indirizzo: esitoEmail.senza_email,
     stato,
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
   }
@@ -423,22 +764,6 @@ Deno.serve(async (req) => {
       materializzati = Number(data ?? 0)
     }
 
-    const serviceAccountRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON')
-    if (!serviceAccountRaw) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON non configurato nei Secrets')
-    }
-
-    const serviceAccount = JSON.parse(serviceAccountRaw) as Record<string, string>
-    if (
-      !serviceAccount.project_id ||
-      !serviceAccount.client_email ||
-      !serviceAccount.private_key
-    ) {
-      throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON incompleto')
-    }
-
-    const accessToken = await googleAccessToken(serviceAccount)
-
     let messaggi: Array<Record<string, any>> = []
 
     if (messaggioId) {
@@ -471,13 +796,39 @@ Deno.serve(async (req) => {
       messaggi = data ?? []
     }
 
+    const smtpConfig = parseSmtpConfig()
+
+    const servePush = messaggi.some((m) => m.invia_push !== false)
+    let fcmConfig: FcmConfig | null = null
+    if (servePush) {
+      const serviceAccountRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON')
+      if (!serviceAccountRaw) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON non configurato nei Secrets')
+      }
+
+      const serviceAccount = JSON.parse(serviceAccountRaw) as Record<string, string>
+      if (
+        !serviceAccount.project_id ||
+        !serviceAccount.client_email ||
+        !serviceAccount.private_key
+      ) {
+        throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON incompleto')
+      }
+
+      const accessToken = await googleAccessToken(serviceAccount)
+      fcmConfig = {
+        accessToken,
+        projectId: serviceAccount.project_id,
+      }
+    }
+
     const riepilogo: Array<Record<string, unknown>> = []
     for (const messaggio of messaggi) {
       const esito = await inviaMessaggio(
         supabaseAdmin,
-        accessToken,
-        serviceAccount,
         messaggio,
+        fcmConfig,
+        smtpConfig,
       )
       if (esito) riepilogo.push(esito)
     }

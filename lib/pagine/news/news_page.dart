@@ -145,6 +145,7 @@ class _NewsPageState extends State<NewsPage> {
         final elenco = _elencoNews();
         final dettaglio = Card(
           margin: EdgeInsets.zero,
+          color: Theme.of(context).colorScheme.surfaceContainerHigh,
           child: _dettaglio(),
         );
 
@@ -171,6 +172,7 @@ class _NewsPageState extends State<NewsPage> {
 
   /// Costruisce localmente l'elenco delle news.
   Widget _elencoNews() => Card(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
         margin: EdgeInsets.zero,
         clipBehavior: Clip.antiAlias,
         child: ListView.separated(
@@ -206,9 +208,11 @@ class _NewsPageState extends State<NewsPage> {
       return const Center(child: Text('Seleziona una news.'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: <Widget>[
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
         Row(
           children: <Widget>[
             Expanded(
@@ -237,7 +241,8 @@ class _NewsPageState extends State<NewsPage> {
         ),
         const Divider(height: 32),
         _campiNews(news),
-      ],
+        ],
+      ),
     );
   }
 

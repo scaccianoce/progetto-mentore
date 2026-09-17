@@ -1,21 +1,31 @@
 INVENTARIO STRUTTURALE ACQUISITO
 ================================
-Tabelle public: 28
-Colonne (incluse colonne view nell'export originario): 275
-Enum: 20
-Valori enum: 93
-Constraint: 97
-Indici: 82
-Views: 1
-Functions PostgreSQL: 77
-Trigger applicativi: 13
-Tabelle con RLS inventariate: 28
-Policies public/storage: 125
-Grant tabella inventariati: 417
-Grant funzione inventariati: 99
-Extensions: 7
-Storage buckets: 3
-Cron jobs: 1
 
-Questo pacchetto deriva esclusivamente da query read-only eseguite sul progetto
-sorgente. La generazione dei file NON ha modificato il database.
+Aggiornamento live del: 2026-09-15 21:00:12 CEST
+Progetto Supabase: yjcoldhertzaaypkyjlj (TEST_db_mentore)
+Fonte live usata: supabase gen types --linked --schema public
+
+Conteggi dallo snapshot live (public):
+- Tabelle public: 29
+- Colonne tabelle public: 294
+- Views public: 2
+- Functions PostgreSQL (esposte in types): 71
+- Enum public: 21
+- Valori enum: 50
+
+Artefatti aggiornati in questo sync:
+- source-inventory/Database.types.live.ts
+- sql/17_mentoraggi_google_sheet.sql
+- edge-functions/mentoraggi-google-sheet/index.ts
+
+Differenze live integrate nel bundle di rebuild:
+- enum stato_partecipazione_annuale;
+- view mentoraggi_google_sheet;
+- funzione e trigger sync_mentoraggio_google_sheet.
+
+L'accesso live avviene tramite Supabase CLI collegata al progetto. Il dump SQL
+completo richiede ancora Docker/Podman, ma le definizioni sopra sono state
+estratte direttamente dai cataloghi PostgreSQL con sole query SELECT.
+
+Questo aggiornamento deriva esclusivamente da interrogazioni read-only sul progetto
+sorgente. Nessuna modifica e' stata applicata al database.

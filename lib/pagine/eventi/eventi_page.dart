@@ -172,6 +172,9 @@ class _EventiPageState extends State<EventiPage> {
                             ? const Center(child: Text('Seleziona un evento.'))
                             : Card(
                                 margin: EdgeInsets.zero,
+                            color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHigh,
                                 child: _dettaglio(selezionato),
                               );
                         if (constraints.maxWidth >= 800) {
@@ -201,6 +204,7 @@ class _EventiPageState extends State<EventiPage> {
 
   /// Costruisce localmente l'elenco eventi.
   Widget _elencoEventi() => Card(
+    color: Theme.of(context).colorScheme.surfaceContainerLow, // elenco
     margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
     child: ListView.separated(
@@ -239,9 +243,11 @@ class _EventiPageState extends State<EventiPage> {
 
     final locandina = testoDa(evento['locandina_url']);
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: <Widget>[
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
         if (locandina.isNotEmpty) ...[
           Center(
             child: ConstrainedBox(
@@ -347,7 +353,8 @@ class _EventiPageState extends State<EventiPage> {
             ],
           ),
         ],
-      ],
+        ],
+      ),
     );
   }
 

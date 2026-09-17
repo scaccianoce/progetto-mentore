@@ -34,6 +34,9 @@ docs/SECRETS_REQUIRED.txt
 Poi:
 13_cron.sql
 13b_OTHER_correzioni.sql
+15_profilo_partecipazioni_annuali.sql
+16_menu_novita.sql
+17_mentoraggi_google_sheet.sql
 
 Infine:
 14_verify.sql

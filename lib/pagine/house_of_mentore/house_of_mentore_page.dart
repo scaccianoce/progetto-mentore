@@ -152,6 +152,9 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
                               )
                             : Card(
                                 margin: EdgeInsets.zero,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerHigh,
                                 child: _dettaglio(selezionato),
                               );
                         if (constraints.maxWidth >= 800) {
@@ -181,6 +184,7 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
 
   /// Costruisce localmente l'elenco delle iniziative House of Mentore.
   Widget _elencoEventi() => Card(
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
     margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
     child: ListView.separated(
@@ -219,92 +223,95 @@ class _HouseOfMentorePageState extends State<HouseOfMentorePage> {
     final iscrizioniAperte = evento['iscrizioni_aperte'] == true;
     final locandina = testoDa(evento['locandina_url']);
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: <Widget>[
-        if (locandina.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Image.network(
-              locandina,
-              height: 260,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const SizedBox(
-                height: 100,
-                child: Center(child: Text('Locandina non disponibile.')),
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
+          if (locandina.isNotEmpty)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                locandina,
+                height: 260,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => const SizedBox(
+                  height: 100,
+                  child: Center(child: Text('Locandina non disponibile.')),
+                ),
               ),
             ),
-          ),
-        _campiEvento(evento),
-        const Divider(height: 32),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'Alternative di partecipazione',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            if (controller.puoGestire)
-              TextButton.icon(
-                onPressed: () => _apriEditorOpzione(eventoId),
-                icon: const Icon(Icons.add),
-                label: const Text('Aggiungi'),
-              ),
-          ],
-        ),
-        if (opzioni.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('Le alternative non sono ancora disponibili.'),
-          )
-        else
-          for (final opzione in opzioni)
-            _OpzioneTile(
-              opzione: opzione,
-              selezionata:
-                  iscrizione?['opzione_id']?.toString() ==
-                  opzione['id'].toString(),
-              abilitata: iscrizioniAperte,
-              puoGestire: controller.puoGestire,
-              onScegli: () => _scegli(eventoId, opzione['id'].toString()),
-              onModifica: () => _apriEditorOpzione(eventoId, opzione: opzione),
-              onElimina: () => _eliminaOpzione(opzione),
-            ),
-        if (!iscrizioniAperte)
-          const Padding(
-            padding: EdgeInsets.only(top: 12),
-            child: Text('Le iscrizioni non sono aperte.'),
-          ),
-        if (iscrizione != null)
-          TextButton.icon(
-            onPressed: iscrizioniAperte
-                ? () => _cancellaIscrizione(eventoId)
-                : null,
-            icon: const Icon(Icons.event_busy),
-            label: const Text('Cancella la mia iscrizione'),
-          ),
-        if (controller.puoGestire) ...<Widget>[
+          _campiEvento(evento),
           const Divider(height: 32),
-          _elencoIscritti(evento),
-          const Divider(height: 32),
-          Wrap(
-            spacing: 8,
+          Row(
             children: <Widget>[
-              OutlinedButton.icon(
-                onPressed: () => _apriEditorEvento(evento),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Modifica evento'),
+              Expanded(
+                child: Text(
+                  'Alternative di partecipazione',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-              OutlinedButton.icon(
-                onPressed: () => _eliminaEvento(evento),
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Elimina evento'),
-              ),
+              if (controller.puoGestire)
+                TextButton.icon(
+                  onPressed: () => _apriEditorOpzione(eventoId),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Aggiungi'),
+                ),
             ],
           ),
+          if (opzioni.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('Le alternative non sono ancora disponibili.'),
+            )
+          else
+            for (final opzione in opzioni)
+              _OpzioneTile(
+                opzione: opzione,
+                selezionata:
+                    iscrizione?['opzione_id']?.toString() ==
+                    opzione['id'].toString(),
+                abilitata: iscrizioniAperte,
+                puoGestire: controller.puoGestire,
+                onScegli: () => _scegli(eventoId, opzione['id'].toString()),
+                onModifica: () => _apriEditorOpzione(eventoId, opzione: opzione),
+                onElimina: () => _eliminaOpzione(opzione),
+              ),
+          if (!iscrizioniAperte)
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text('Le iscrizioni non sono aperte.'),
+            ),
+          if (iscrizione != null)
+            TextButton.icon(
+              onPressed: iscrizioniAperte
+                  ? () => _cancellaIscrizione(eventoId)
+                  : null,
+              icon: const Icon(Icons.event_busy),
+              label: const Text('Cancella la mia iscrizione'),
+            ),
+          if (controller.puoGestire) ...<Widget>[
+            const Divider(height: 32),
+            _elencoIscritti(evento),
+            const Divider(height: 32),
+            Wrap(
+              spacing: 8,
+              children: <Widget>[
+                OutlinedButton.icon(
+                  onPressed: () => _apriEditorEvento(evento),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Modifica evento'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _eliminaEvento(evento),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Elimina evento'),
+                ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 

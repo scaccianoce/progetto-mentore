@@ -71,6 +71,11 @@ class NotificheRepository {
     int limite = 200,
   }) =>
       _database.tabella('notifiche_messaggi').elenco(
+        colonne:
+            'id, regola_id, anno_accademico, titolo, messaggio, destinatari, '
+            'destinatari_configurazione, origine_tabella, origine_id, '
+            'programmata_per, inviata_at, stato, created_at, '
+            'invia_push, invia_email, tipo_messaggio, tipo_evento_utente',
         ordinamenti: const <OrdineDb>[
           OrdineDb('created_at', crescente: false),
         ],
@@ -79,13 +84,53 @@ class NotificheRepository {
 
   Future<List<Map<String, dynamic>>> destinatariMessaggio(
     String messaggioId,
-  ) =>
-      _database.rpcElenco(
-        'notifiche_dettaglio_destinatari',
-        parametri: <String, dynamic>{
-          'p_messaggio_id': messaggioId,
-        },
-      );
+  ) async {
+    final destinatari = await _database.tabella('notifiche_destinatari').elenco(
+      colonne:
+          'id, user_id, stato, inviato_at, letto_at, errore, created_at, '
+          'push_stato, push_tentativi, push_inviata_at, push_errore, '
+          'email_stato, email_tentativi, email_programmata_per, '
+          'email_inviata_at, email_errore',
+      filtri: <FiltroDb>[
+        FiltroDb.uguale('messaggio_id', messaggioId),
+      ],
+      ordinamenti: const <OrdineDb>[
+        OrdineDb('created_at', crescente: true),
+      ],
+    );
+
+    final userIds = destinatari
+        .map((r) => r['user_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    final anagrafica = userIds.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : await _database.tabella('anagrafica').elenco(
+            colonne: 'user_id, nome, cognome, email_unipa',
+            filtri: <FiltroDb>[
+              FiltroDb.inLista('user_id', userIds.cast<Object>()),
+            ],
+          );
+
+    final perUserId = <String, Map<String, dynamic>>{
+      for (final r in anagrafica)
+        (r['user_id']?.toString() ?? ''): Map<String, dynamic>.from(r),
+    };
+
+    return destinatari.map((r) {
+      final userId = r['user_id']?.toString() ?? '';
+      final persona = perUserId[userId] ?? const <String, dynamic>{};
+      return <String, dynamic>{
+        ...Map<String, dynamic>.from(r),
+        'nome': persona['nome'],
+        'cognome': persona['cognome'],
+        'email_unipa': persona['email_unipa'],
+      };
+    }).toList(growable: false);
+  }
 
   /// Restituisce le scelte necessarie al dialog di creazione manuale.
   Future<List<Map<String, dynamic>>> opzioniDestinatari(String tipo) {

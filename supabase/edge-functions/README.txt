@@ -3,9 +3,17 @@ EDGE FUNCTIONS - INVENTARIO DA COMPLETARE
 
 Le Edge Functions NON sono incluse nel dump SQL PostgreSQL.
 
-Dal materiale della conversazione sappiamo con certezza dell'esistenza di:
+Sorgenti presenti localmente:
 - notifiche-invia
 - backoffice-user-admin
+- smart-task
+- mentoraggi-google-sheet
+
+La funzione mentoraggi-google-sheet viene invocata dal trigger PostgreSQL
+sync_mentoraggi_google_sheet e legge le variabili di ambiente:
+- GOOGLE_SCRIPT_URL
+- GOOGLE_SCRIPT_SECRET
+- secret:google_sheet_sync (gestito dalla configurazione withSupabase)
 
 Per una ricostruzione realmente completa servono i sorgenti ATTUALI di tutte le
 Edge Functions presenti nel Dashboard Supabase.

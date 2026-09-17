@@ -143,6 +143,7 @@ class _MenteePageState extends State<MenteePage> {
 
   /// Costruisce localmente l'elenco dei mentoraggi disponibili al mentee.
   Widget _elencoMentoraggi() => Card(
+    color: Theme.of(context).colorScheme.surfaceContainerLow,
     margin: EdgeInsets.zero,
     clipBehavior: Clip.antiAlias,
     child: ListView.separated(
@@ -179,9 +180,11 @@ class _MenteePageState extends State<MenteePage> {
       return const Center(child: Text('Seleziona un mentoraggio.'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: <Widget>[
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: <Widget>[
         LayoutBuilder(
           builder: (context, constraints) {
             final titolo = Text(
@@ -249,7 +252,8 @@ class _MenteePageState extends State<MenteePage> {
         const Divider(),
         _campiMentoraggio(percorso.mentoraggio),
         ..._linkPdf(percorso.mentoraggio),
-      ],
+        ],
+      ),
     );
   }
 

@@ -88,12 +88,39 @@ class _MentoreAppState extends State<MentoreApp> {
 
   @override
   Widget build(BuildContext context) {
+    //final tema = ThemeData(
+    //  useMaterial3: true,
+    //  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+    //  inputDecorationTheme: const InputDecorationTheme(
+    //    labelStyle: TextStyle(fontWeight: FontWeight.bold),
+    //    floatingLabelStyle: TextStyle(fontWeight: FontWeight.bold),
+    //  ),
+    // );
+
+    final base = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF1565C0),
+      brightness: Brightness.light,
+    );
+
     final tema = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
-      inputDecorationTheme: const InputDecorationTheme(
-        labelStyle: TextStyle(fontWeight: FontWeight.bold),
-        floatingLabelStyle: TextStyle(fontWeight: FontWeight.bold),
+      colorScheme: base.copyWith(
+        surface: const Color(0xFFF7F9FC),
+        surfaceContainerLowest: const Color(0xFFFFFFFF),
+        surfaceContainerLow: const Color(0xFFF1F5FB),
+        surfaceContainer: const Color(0xFFE9F0FA),
+        surfaceContainerHigh: const Color(0xFFE1EBF8),
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFFF1F5FB),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: Color(0xFFD7E3F4)),
+        ),
+      ),
+      dialogTheme: const DialogThemeData(
+        backgroundColor: Color(0xFFFBFDFF),
       ),
     );
 
