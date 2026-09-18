@@ -31,8 +31,8 @@ abstract final class AppConfig {
   // ==========================================================================
 
   static const AppEnvironment ambiente =
-      // AppEnvironment.produzione;
-      AppEnvironment.test;
+      AppEnvironment.produzione;
+      //AppEnvironment.test;
 
   // ==========================================================================
   // SUPABASE - PRODUZIONE
