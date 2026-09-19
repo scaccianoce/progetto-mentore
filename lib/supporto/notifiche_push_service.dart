@@ -220,6 +220,21 @@ class NotifichePushService {
     }
   }
 
+  /// Esegue una disassociazione completa del dispositivo in fase di logout:
+  /// - disattiva il token lato backend per l'utente corrente
+  /// - rimuove il token locale Firebase (FCM/APNs)
+  Future<void> dissociaDispositivoPerLogout() async {
+    await disattivaDispositivoCorrente();
+
+    try {
+      await _messaging.deleteToken();
+      _ultimoToken = null;
+    } catch (errore) {
+      _errore = 'Impossibile cancellare il token locale del dispositivo: $errore';
+      debugPrint('[PushService] $_errore');
+    }
+  }
+
   /// Restituisce la rotta applicativa associata alla notifica ricevuta.
   String percorsoPer(RemoteMessage messaggio) {
     final origine = messaggio.data['origine_tabella']?.toString();

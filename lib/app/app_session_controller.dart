@@ -109,7 +109,7 @@ class SessioneController extends ChangeNotifier {
     _errore = null;
 
     try {
-      await NotifichePushService.instance.disattivaDispositivoCorrente();
+      await NotifichePushService.instance.dissociaDispositivoPerLogout();
       await db.esci();
       await _caricaUtente(null);
     } catch (e) {
