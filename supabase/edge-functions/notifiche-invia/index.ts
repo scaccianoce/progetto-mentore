@@ -482,6 +482,16 @@ async function inviaMessaggio(
   let emailPianificate = 0
   let emailPronteOggi = 0
   if (inviaEmail) {
+    // Compatibilita': alcuni flussi legacy generano destinatari con
+    // email_stato='non_richiesta' anche quando il messaggio richiede email.
+    // Li riallineiamo prima della pianificazione.
+    const { error: riallineaEmailError } = await supabaseAdmin
+      .from('notifiche_destinatari')
+      .update({ email_stato: 'da_inviare' })
+      .eq('messaggio_id', messaggio.id)
+      .eq('email_stato', 'non_richiesta')
+    if (riallineaEmailError) throw riallineaEmailError
+
     const email = await pianificaEmailMessaggio(
       supabaseAdmin,
       String(messaggio.id),
@@ -574,7 +584,7 @@ async function inviaMessaggio(
     .from('notifiche_destinatari')
     .select('id, user_id, push_stato')
     .eq('messaggio_id', messaggio.id)
-    .in('push_stato', ['da_inviare', 'fallita', 'senza_dispositivo'])
+    .in('push_stato', ['da_inviare', 'fallita'])
 
   if (destinatariError) throw destinatariError
 
@@ -627,7 +637,7 @@ async function inviaMessaggio(
         .from('notifiche_destinatari')
         .update({
           stato: 'senza_dispositivo',
-          push_stato: 'senza_dispositivo',
+          push_stato: 'esclusa',
           errore: null,
           push_errore: null,
         })
@@ -775,6 +785,7 @@ Deno.serve(async (req: Request) => {
         .in('stato', [
           'da_inviare',
           'programmato',
+          'in_invio',
           'errore',
           'parziale',
         ])

@@ -82,6 +82,7 @@ class NotifichePushService {
         (token) => unawaited(_registraToken(token)),
         onError: (Object errore) {
           _errore = 'Aggiornamento token FCM non riuscito: $errore';
+          debugPrint('[PushService] $_errore');
         },
       );
 
@@ -127,6 +128,7 @@ class NotifichePushService {
       }
     } catch (errore) {
       _errore = 'Notifiche push non inizializzate: $errore';
+      debugPrint('[PushService] $_errore');
       _inizializzato = false;
     }
   }
@@ -163,6 +165,7 @@ class NotifichePushService {
       await _registraToken(token);
     } catch (errore) {
       _errore = 'Registrazione dispositivo non riuscita: $errore';
+      debugPrint('[PushService] $_errore');
     }
   }
 
@@ -171,7 +174,12 @@ class NotifichePushService {
     if (!_repository.utenteAutenticato) return;
 
     final piattaforma = _piattaformaCorrente();
-    if (piattaforma == null) return;
+    if (piattaforma == null) {
+      debugPrint(
+        '[PushService] Registrazione saltata: piattaforma non supportata per push.',
+      );
+      return;
+    }
 
     try {
       await _repository.registraDispositivo(
@@ -182,6 +190,7 @@ class NotifichePushService {
       _errore = null;
     } catch (errore) {
       _errore = 'Impossibile registrare il dispositivo: $errore';
+      debugPrint('[PushService] $_errore');
     }
   }
 

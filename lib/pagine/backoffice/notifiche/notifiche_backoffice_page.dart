@@ -949,8 +949,8 @@ class _MessaggioManualeDialogState extends State<_MessaggioManualeDialog> {
         programmato: _programmataPer != null,
       );
 
-      final dettaglioInvio = _programmataPer == null
-          ? ' · invio push completato'
+        final dettaglioInvio = _programmataPer == null
+          ? ' · invio avviato'
           : ' · invio programmato';
 
       if (!mounted) return;

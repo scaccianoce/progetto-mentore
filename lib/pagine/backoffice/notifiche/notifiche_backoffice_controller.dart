@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../ui/dinamico_schema.dart';
 import '../../../dati/repository.dart';
 
@@ -42,7 +44,7 @@ class NotificheBackofficeController {
       repository.opzioniDestinatari(tipo);
 
   /// Crea o aggiorna una notifica, rigenera i destinatari e, se non è
-  /// programmata, avvia immediatamente l'invio push.
+  /// programmata, avvia l'invio in background senza bloccare la UI.
   Future<int> salvaMessaggio({
     String? messaggioId,
     required Map<String, dynamic> payload,
@@ -64,7 +66,8 @@ class NotificheBackofficeController {
     try {
       final numeroDestinatari = await repository.generaDestinatari(id);
       if (!programmato) {
-        await repository.inviaMessaggio(id);
+        // L'invio può richiedere tempo: non bloccare il dialog di creazione.
+        unawaited(repository.inviaMessaggio(id).catchError((_) {}));
       }
       return numeroDestinatari;
     } catch (_) {
