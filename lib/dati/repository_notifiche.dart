@@ -23,10 +23,13 @@ class NotificheRepository {
 
   bool get utenteAutenticato => userIdCorrente != null;
 
-  /// Espone al servizio push soltanto lo stato logico di autenticazione,
-  /// senza propagare tipi Supabase al livello `supporto`.
-  Stream<bool> get cambiStatoAutenticazione => _client.auth.onAuthStateChange
-      .map((stato) => stato.session?.user != null)
+  /// Espone al servizio push l'utente della sessione corrente senza propagare
+  /// tipi Supabase al livello `supporto`.
+  ///
+  /// L'ID, invece di un semplice booleano, permette di rilevare anche un
+  /// eventuale cambio diretto di account sullo stesso dispositivo.
+  Stream<String?> get cambiUtenteAutenticato => _client.auth.onAuthStateChange
+      .map((stato) => stato.session?.user.id)
       .distinct();
 
   /// Conta le notifiche inviate ma non ancora lette dall'utente corrente.

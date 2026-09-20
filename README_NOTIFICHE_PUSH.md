@@ -59,6 +59,12 @@ FIREBASE_WEB_MEASUREMENT_ID
 
 FCM Web richiede inoltre il service worker Firebase previsto dalla configurazione Web.
 
+Il canale push segue la sessione applicativa: il permesso e il token vengono
+richiesti dopo il login. Al logout il token viene prima disattivato nel backend
+per l'utente corrente e poi eliminato localmente con `FirebaseMessaging.deleteToken()`.
+Sul Web/PWA questa operazione rimuove la registrazione FCM conservata dal browser;
+il login successivo genera un token valido e lo associa al nuovo utente.
+
 ## 3. SQL dispositivi
 
 Eseguire `NOTIFICHE_DISPOSITIVI_RLS.sql` nel SQL Editor di Supabase.

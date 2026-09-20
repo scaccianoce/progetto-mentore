@@ -36,11 +36,14 @@ class NotifichePushService {
   Stream<RemoteMessage> get notificheForeground => _foregroundController.stream;
 
   StreamSubscription<String>? _tokenSubscription;
-  StreamSubscription<bool>? _authSubscription;
+  StreamSubscription<String?>? _authSubscription;
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
 
   bool _inizializzato = false;
+  bool _registrazioneConsentita = false;
+  int _versioneSessionePush = 0;
+  Future<void> _codaOperazioniPush = Future<void>.value();
   String? _ultimoToken;
   String? _errore;
 
@@ -59,19 +62,6 @@ class NotifichePushService {
         );
       }
 
-      final impostazioni = await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-
-      if (impostazioni.authorizationStatus == AuthorizationStatus.denied) {
-        _errore = 'Permesso notifiche non concesso.';
-        _inizializzato = true;
-        return;
-      }
-
       await _messaging.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
@@ -79,26 +69,24 @@ class NotifichePushService {
       );
 
       _tokenSubscription ??= _messaging.onTokenRefresh.listen(
-        (token) => unawaited(_registraToken(token)),
+        (token) => unawaited(_accodaRegistrazioneToken(token)),
         onError: (Object errore) {
           _errore = 'Aggiornamento token FCM non riuscito: $errore';
           debugPrint('[PushService] $_errore');
         },
       );
 
-      _authSubscription ??= _repository.cambiStatoAutenticazione.listen(
-        (autenticato) {
-          if (autenticato) {
-            unawaited(sincronizzaDispositivo());
-            unawaited(aggiornaNonLette());
-          } else {
-            nonLette.value = 0;
-          }
+      _authSubscription ??= _repository.cambiUtenteAutenticato.listen(
+        (userId) => unawaited(_accodaCambioUtente(userId)),
+        onError: (Object errore) {
+          _errore = 'Aggiornamento sessione push non riuscito: $errore';
+          debugPrint('[PushService] $_errore');
         },
       );
 
       _foregroundSubscription ??= FirebaseMessaging.onMessage.listen(
         (messaggio) {
+          if (!_repository.utenteAutenticato) return;
           aggiornamenti.value++;
           unawaited(aggiornaNonLette());
           _foregroundController.add(messaggio);
@@ -107,6 +95,7 @@ class NotifichePushService {
 
       _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
         (messaggio) {
+          if (!_repository.utenteAutenticato) return;
           aggiornamenti.value++;
           unawaited(aggiornaNonLette());
           _apertureController.add(messaggio);
@@ -115,13 +104,14 @@ class NotifichePushService {
 
       _inizializzato = true;
 
-      await sincronizzaDispositivo();
-      await aggiornaNonLette();
+      await _accodaCambioUtente(_repository.userIdCorrente);
 
+      final userIdIniziale = _repository.userIdCorrente;
       final iniziale = await _messaging.getInitialMessage();
-      if (iniziale != null) {
+      if (iniziale != null && userIdIniziale != null) {
         Future<void>.delayed(const Duration(milliseconds: 300), () {
-          if (!_apertureController.isClosed) {
+          if (!_apertureController.isClosed &&
+              _repository.userIdCorrente == userIdIniziale) {
             _apertureController.add(iniziale);
           }
         });
@@ -130,6 +120,55 @@ class NotifichePushService {
       _errore = 'Notifiche push non inizializzate: $errore';
       debugPrint('[PushService] $_errore');
       _inizializzato = false;
+    }
+  }
+
+  /// Attiva o rimuove il canale push in base alla sessione applicativa.
+  ///
+  /// Il permesso viene richiesto soltanto dopo il login. In assenza di una
+  /// sessione, `deleteToken` elimina anche la registrazione FCM conservata dal
+  /// browser/PWA, impedendo che venga riutilizzata dal precedente utente.
+  Future<void> _accodaCambioUtente(String? userId) {
+    final versione = ++_versioneSessionePush;
+    _codaOperazioniPush = _codaOperazioniPush.then<void>(
+      (_) => _gestisciCambioUtente(userId, versione),
+      onError: (_) => _gestisciCambioUtente(userId, versione),
+    );
+    return _codaOperazioniPush;
+  }
+
+  Future<void> _gestisciCambioUtente(String? userId, int versione) async {
+    if (versione != _versioneSessionePush) return;
+
+    if (userId == null) {
+      _registrazioneConsentita = false;
+      nonLette.value = 0;
+      await _cancellaTokenLocale();
+      return;
+    }
+
+    _registrazioneConsentita = true;
+
+    try {
+      final impostazioni = await _messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
+
+      if (versione != _versioneSessionePush) return;
+
+      if (impostazioni.authorizationStatus == AuthorizationStatus.denied) {
+        _errore = 'Permesso notifiche non concesso.';
+        return;
+      }
+
+      await sincronizzaDispositivo();
+      await aggiornaNonLette();
+    } catch (errore) {
+      _errore = 'Attivazione notifiche non riuscita: $errore';
+      debugPrint('[PushService] $_errore');
     }
   }
 
@@ -150,6 +189,7 @@ class NotifichePushService {
   /// Recupera il token FCM corrente e lo sincronizza con il backend.
   Future<void> sincronizzaDispositivo() async {
     if (!_inizializzato || Firebase.apps.isEmpty) return;
+    if (!_registrazioneConsentita) return;
     if (!_repository.utenteAutenticato) return;
 
     try {
@@ -171,6 +211,7 @@ class NotifichePushService {
 
   /// Registra nel backend il token del dispositivo corrente.
   Future<void> _registraToken(String token) async {
+    if (!_registrazioneConsentita) return;
     if (!_repository.utenteAutenticato) return;
 
     final piattaforma = _piattaformaCorrente();
@@ -192,6 +233,14 @@ class NotifichePushService {
       _errore = 'Impossibile registrare il dispositivo: $errore';
       debugPrint('[PushService] $_errore');
     }
+  }
+
+  Future<void> _accodaRegistrazioneToken(String token) {
+    _codaOperazioniPush = _codaOperazioniPush.then<void>(
+      (_) => _registraToken(token),
+      onError: (_) => _registraToken(token),
+    );
+    return _codaOperazioniPush;
   }
 
   /// Disattiva il token corrente prima del logout.
@@ -224,7 +273,35 @@ class NotifichePushService {
   /// - disattiva il token lato backend per l'utente corrente
   /// - rimuove il token locale Firebase (FCM/APNs)
   Future<void> dissociaDispositivoPerLogout() async {
-    await disattivaDispositivoCorrente();
+    if (!_inizializzato || Firebase.apps.isEmpty) return;
+
+    _registrazioneConsentita = false;
+    final versione = ++_versioneSessionePush;
+
+    _codaOperazioniPush = _codaOperazioniPush.then<void>((_) async {
+      if (versione != _versioneSessionePush) return;
+      await disattivaDispositivoCorrente();
+      await _cancellaTokenLocale();
+    }, onError: (_) async {
+      if (versione != _versioneSessionePush) return;
+      await disattivaDispositivoCorrente();
+      await _cancellaTokenLocale();
+    });
+
+    await _codaOperazioniPush;
+  }
+
+  /// Riattiva il canale se il logout applicativo non e' andato a buon fine.
+  Future<void> ripristinaDopoLogoutFallito() async {
+    if (!_repository.utenteAutenticato) return;
+    await _accodaCambioUtente(_repository.userIdCorrente);
+  }
+
+  Future<void> _cancellaTokenLocale() async {
+    if (Firebase.apps.isEmpty) {
+      _ultimoToken = null;
+      return;
+    }
 
     try {
       await _messaging.deleteToken();
@@ -271,6 +348,8 @@ class NotifichePushService {
     _foregroundSubscription = null;
     _openedSubscription = null;
     _inizializzato = false;
+    _registrazioneConsentita = false;
+    _versioneSessionePush++;
 
     if (!_apertureController.isClosed) {
       await _apertureController.close();
