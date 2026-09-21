@@ -1,5 +1,7 @@
 import { GoogleAuth } from 'npm:google-auth-library@9'
 
+const WEB_APP_URL = 'https://scaccianoce.github.io/progetto-mentore'
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -94,6 +96,23 @@ Deno.serve(async (req: Request) => {
             data: {
               tipo: 'test',
               origine_tabella: 'test',
+              link: './#/notifiche',
+            },
+            android: {
+              priority: 'high',
+              notification: { sound: 'default' },
+            },
+            apns: {
+              payload: { aps: { sound: 'default' } },
+            },
+            webpush: {
+              notification: {
+                icon: `${WEB_APP_URL}/icons/Icon-192.png`,
+                badge: `${WEB_APP_URL}/icons/Icon-192.png`,
+              },
+              fcm_options: {
+                link: `${WEB_APP_URL}/#/notifiche`,
+              },
             },
           },
         }),
