@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,7 +24,8 @@ class _NotifichePageState extends State<NotifichePage> {
   @override
   void initState() {
     super.initState();
-    _controller = NotificheController()..carica();
+    _controller = NotificheController();
+    unawaited(_aggiorna());
     NotifichePushService.instance.aggiornamenti.addListener(_pushRicevuta);
   }
 
@@ -37,6 +40,24 @@ class _NotifichePageState extends State<NotifichePage> {
   /// Gestisce l’operazione interna “push ricevuta” della pagina.
   void _pushRicevuta() {
     _controller.carica();
+  }
+
+  /// Ricarica le notifiche e ripristina, se necessario, la registrazione FCM.
+  Future<void> _aggiorna({bool mostraEsitoPush = false}) async {
+    final push = NotifichePushService.instance;
+    final registrato = await push.sincronizzaDispositivo();
+    await _controller.carica();
+
+    if (!mounted || !mostraEsitoPush) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          registrato
+              ? 'Dispositivo registrato per le notifiche push.'
+              : push.errore ?? 'Registrazione push non riuscita.',
+        ),
+      ),
+    );
   }
 
   /// Costruisce l’interfaccia grafica di questo componente.
@@ -63,7 +84,9 @@ class _NotifichePageState extends State<NotifichePage> {
                 const SizedBox(width: 8),
                 IconButton(
                   tooltip: 'Aggiorna',
-                  onPressed: _controller.caricamento ? null : _controller.carica,
+                  onPressed: _controller.caricamento
+                      ? null
+                      : () => _aggiorna(mostraEsitoPush: true),
                   icon: const Icon(Icons.refresh),
                 ),
               ],

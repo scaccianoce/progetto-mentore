@@ -187,10 +187,10 @@ class NotifichePushService {
   }
 
   /// Recupera il token FCM corrente e lo sincronizza con il backend.
-  Future<void> sincronizzaDispositivo() async {
-    if (!_inizializzato || Firebase.apps.isEmpty) return;
-    if (!_registrazioneConsentita) return;
-    if (!_repository.utenteAutenticato) return;
+  Future<bool> sincronizzaDispositivo() async {
+    if (!_inizializzato || Firebase.apps.isEmpty) return false;
+    if (!_registrazioneConsentita) return false;
+    if (!_repository.utenteAutenticato) return false;
 
     try {
       final token = await _messaging.getToken(
@@ -199,13 +199,15 @@ class NotifichePushService {
 
       if (token == null || token.trim().isEmpty) {
         _errore = 'Firebase non ha restituito un token FCM.';
-        return;
+        return false;
       }
 
       await _registraToken(token);
+      return _ultimoToken == token && _errore == null;
     } catch (errore) {
       _errore = 'Registrazione dispositivo non riuscita: $errore';
       debugPrint('[PushService] $_errore');
+      return false;
     }
   }
 

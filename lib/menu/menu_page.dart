@@ -63,6 +63,7 @@ void initState() {
   ) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_novitaController.carica());
+      unawaited(NotifichePushService.instance.sincronizzaDispositivo());
     }
   }
 
