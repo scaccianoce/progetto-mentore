@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../configurazione/firebase_config.dart';
 import '../dati/repository.dart';
@@ -16,16 +18,17 @@ class NotifichePushService {
   NotifichePushService._();
 
   static final NotifichePushService instance = NotifichePushService._();
+  static const _chiaveDeviceId = 'notifiche_device_id_v1';
+  static const _chiaveTokenDisattivato = 'notifiche_token_disattivato_v1';
 
   final NotificheRepository _repository = NotificheRepository();
 
   FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
   Future<String?> _recuperaToken() => _messaging.getToken(
-        vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
-        serviceWorkerScriptPath:
-            kIsWeb ? 'firebase-messaging-sw.js' : null,
-      );
+    vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
+    serviceWorkerScriptPath: kIsWeb ? 'firebase-messaging-sw.js' : null,
+  );
 
   /// Incrementato quando arriva o viene aperta una notifica.
   final ValueNotifier<int> aggiornamenti = ValueNotifier<int>(0);
@@ -50,6 +53,7 @@ class NotifichePushService {
   bool _registrazioneConsentita = false;
   int _versioneSessionePush = 0;
   Future<void> _codaOperazioniPush = Future<void>.value();
+  Future<String>? _deviceIdFuture;
   String? _ultimoToken;
   String? _errore;
 
@@ -90,23 +94,23 @@ class NotifichePushService {
         },
       );
 
-      _foregroundSubscription ??= FirebaseMessaging.onMessage.listen(
-        (messaggio) {
-          if (!_repository.utenteAutenticato) return;
-          aggiornamenti.value++;
-          unawaited(aggiornaNonLette());
-          _foregroundController.add(messaggio);
-        },
-      );
+      _foregroundSubscription ??= FirebaseMessaging.onMessage.listen((
+        messaggio,
+      ) {
+        if (!_repository.utenteAutenticato) return;
+        aggiornamenti.value++;
+        unawaited(aggiornaNonLette());
+        _foregroundController.add(messaggio);
+      });
 
-      _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen(
-        (messaggio) {
-          if (!_repository.utenteAutenticato) return;
-          aggiornamenti.value++;
-          unawaited(aggiornaNonLette());
-          _apertureController.add(messaggio);
-        },
-      );
+      _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((
+        messaggio,
+      ) {
+        if (!_repository.utenteAutenticato) return;
+        aggiornamenti.value++;
+        unawaited(aggiornaNonLette());
+        _apertureController.add(messaggio);
+      });
 
       _inizializzato = true;
 
@@ -131,9 +135,9 @@ class NotifichePushService {
 
   /// Attiva o rimuove il canale push in base alla sessione applicativa.
   ///
-  /// Il permesso viene richiesto soltanto dopo il login. In assenza di una
-  /// sessione, `deleteToken` elimina anche la registrazione FCM conservata dal
-  /// browser/PWA, impedendo che venga riutilizzata dal precedente utente.
+  /// Il permesso viene richiesto soltanto dopo il login. Al logout il token
+  /// viene disattivato lato backend, ma resta nell'installazione: in questo
+  /// modo Firebase non ne genera inutilmente uno nuovo al login successivo.
   Future<void> _accodaCambioUtente(String? userId) {
     final versione = ++_versioneSessionePush;
     _codaOperazioniPush = _codaOperazioniPush.then<void>(
@@ -149,7 +153,10 @@ class NotifichePushService {
     if (userId == null) {
       _registrazioneConsentita = false;
       nonLette.value = 0;
-      await _cancellaTokenLocale();
+      if (!await _tokenGiaDisattivato()) {
+        await _cancellaTokenLocale();
+      }
+      _ultimoToken = null;
       return;
     }
 
@@ -229,10 +236,13 @@ class NotifichePushService {
     }
 
     try {
+      final deviceId = await _deviceIdInstallazione();
       await _repository.registraDispositivo(
         token: token,
         piattaforma: piattaforma,
+        deviceId: deviceId,
       );
+      await _salvaTokenDisattivato(false);
       _ultimoToken = token;
       _errore = null;
     } catch (errore) {
@@ -250,8 +260,8 @@ class NotifichePushService {
   }
 
   /// Disattiva il token corrente prima del logout.
-  Future<void> disattivaDispositivoCorrente() async {
-    if (!_repository.utenteAutenticato) return;
+  Future<bool> disattivaDispositivoCorrente() async {
+    if (!_repository.utenteAutenticato) return false;
 
     String? token = _ultimoToken;
 
@@ -259,38 +269,46 @@ class NotifichePushService {
       try {
         token = await _recuperaToken();
       } catch (_) {
-        return;
+        return false;
       }
     }
 
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) return true;
 
     try {
       await _repository.disattivaDispositivo(token);
       _ultimoToken = null;
+      return true;
     } catch (_) {
       // Il logout non deve essere bloccato dalla disattivazione del push.
+      return false;
     }
   }
 
-  /// Esegue una disassociazione completa del dispositivo in fase di logout:
-  /// - disattiva il token lato backend per l'utente corrente
-  /// - rimuove il token locale Firebase (FCM/APNs)
+  /// Disassocia il dispositivo dall'utente in fase di logout.
+  ///
+  /// Il token locale non viene cancellato: rimane inattivo nel backend e può
+  /// essere riassociato al prossimo utente senza creare una nuova registrazione
+  /// FCM. L'ID dell'installazione garantisce una sola riga nel database anche
+  /// quando Firebase ruota autonomamente il token.
   Future<void> dissociaDispositivoPerLogout() async {
     if (!_inizializzato || Firebase.apps.isEmpty) return;
 
     _registrazioneConsentita = false;
     final versione = ++_versioneSessionePush;
 
-    _codaOperazioniPush = _codaOperazioniPush.then<void>((_) async {
-      if (versione != _versioneSessionePush) return;
-      await disattivaDispositivoCorrente();
-      await _cancellaTokenLocale();
-    }, onError: (_) async {
-      if (versione != _versioneSessionePush) return;
-      await disattivaDispositivoCorrente();
-      await _cancellaTokenLocale();
-    });
+    _codaOperazioniPush = _codaOperazioniPush.then<void>(
+      (_) async {
+        if (versione != _versioneSessionePush) return;
+        final disattivato = await disattivaDispositivoCorrente();
+        await _salvaTokenDisattivato(disattivato);
+      },
+      onError: (_) async {
+        if (versione != _versioneSessionePush) return;
+        final disattivato = await disattivaDispositivoCorrente();
+        await _salvaTokenDisattivato(disattivato);
+      },
+    );
 
     await _codaOperazioniPush;
   }
@@ -299,6 +317,52 @@ class NotifichePushService {
   Future<void> ripristinaDopoLogoutFallito() async {
     if (!_repository.utenteAutenticato) return;
     await _accodaCambioUtente(_repository.userIdCorrente);
+  }
+
+  Future<String> _deviceIdInstallazione() {
+    return _deviceIdFuture ??= _caricaOCreaDeviceIdInstallazione();
+  }
+
+  Future<String> _caricaOCreaDeviceIdInstallazione() async {
+    final preferenze = await SharedPreferences.getInstance();
+    final esistente = preferenze.getString(_chiaveDeviceId)?.trim();
+    if (esistente != null && esistente.isNotEmpty) return esistente;
+
+    final casuale = Random.secure();
+    final byte = List<int>.generate(16, (_) => casuale.nextInt(256));
+    byte[6] = (byte[6] & 0x0f) | 0x40;
+    byte[8] = (byte[8] & 0x3f) | 0x80;
+    final hex = byte
+        .map((valore) => valore.toRadixString(16).padLeft(2, '0'))
+        .join();
+    final deviceId =
+        '${hex.substring(0, 8)}-'
+        '${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-'
+        '${hex.substring(16, 20)}-'
+        '${hex.substring(20)}';
+
+    await preferenze.setString(_chiaveDeviceId, deviceId);
+    return deviceId;
+  }
+
+  Future<bool> _tokenGiaDisattivato() async {
+    try {
+      final preferenze = await SharedPreferences.getInstance();
+      return preferenze.getBool(_chiaveTokenDisattivato) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _salvaTokenDisattivato(bool disattivato) async {
+    try {
+      final preferenze = await SharedPreferences.getInstance();
+      await preferenze.setBool(_chiaveTokenDisattivato, disattivato);
+    } catch (_) {
+      // In caso di storage locale non disponibile prevale la sicurezza:
+      // un successivo logout inatteso cancellera' il token FCM locale.
+    }
   }
 
   Future<void> _cancellaTokenLocale() async {
@@ -310,8 +374,10 @@ class NotifichePushService {
     try {
       await _messaging.deleteToken();
       _ultimoToken = null;
+      await _salvaTokenDisattivato(true);
     } catch (errore) {
-      _errore = 'Impossibile cancellare il token locale del dispositivo: $errore';
+      _errore =
+          'Impossibile cancellare il token locale del dispositivo: $errore';
       debugPrint('[PushService] $_errore');
     }
   }

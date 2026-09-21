@@ -866,9 +866,9 @@ AS $function$
 $function$;
 
 -- --------------------------------------------------------------------------
--- notifiche_registra_dispositivo(p_token text, p_piattaforma text)
+-- notifiche_registra_dispositivo(p_token text, p_piattaforma text, p_device_id text)
 -- --------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.notifiche_registra_dispositivo(p_token text, p_piattaforma text)
+CREATE OR REPLACE FUNCTION public.notifiche_registra_dispositivo(p_token text, p_piattaforma text, p_device_id text)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -890,28 +890,48 @@ begin
     raise exception 'Piattaforma non valida: %', p_piattaforma;
   end if;
 
-  insert into public.notifiche_dispositivi (
-    user_id,
-    token,
-    piattaforma,
-    attivo,
-    ultimo_accesso
-  )
-  values (
-    v_user_id,
-    p_token,
-    p_piattaforma::public.notifiche_piattaforma,
-    true,
-    now()
-  )
-  on conflict (token)
-  do update set
-    user_id = excluded.user_id,
-    piattaforma = excluded.piattaforma,
-    attivo = true,
-    ultimo_accesso = now(),
-    updated_at = now()
-  returning id into v_id;
+  p_device_id := btrim(p_device_id);
+  if p_device_id is null or p_device_id = '' or length(p_device_id) > 200 then
+    raise exception 'Identificatore installazione non valido';
+  end if;
+
+  -- Serializza due registrazioni contemporanee della stessa installazione.
+  perform pg_advisory_xact_lock(hashtextextended(p_device_id, 0));
+
+  select id into v_id
+  from public.notifiche_dispositivi
+  where device_id = p_device_id;
+
+  if v_id is null then
+    -- Migra senza duplicarla un'eventuale riga preesistente nota per token.
+    select id into v_id
+    from public.notifiche_dispositivi
+    where token = p_token;
+  end if;
+
+  if v_id is null then
+    insert into public.notifiche_dispositivi (
+      user_id, token, device_id, piattaforma, attivo, ultimo_accesso
+    ) values (
+      v_user_id, p_token, p_device_id,
+      p_piattaforma::public.notifiche_piattaforma, true, now()
+    )
+    returning id into v_id;
+  else
+    -- Se il token e' stato ruotato, libera l'eventuale vecchia riga legacy.
+    delete from public.notifiche_dispositivi
+    where token = p_token and id <> v_id;
+
+    update public.notifiche_dispositivi
+    set user_id = v_user_id,
+        token = p_token,
+        device_id = p_device_id,
+        piattaforma = p_piattaforma::public.notifiche_piattaforma,
+        attivo = true,
+        ultimo_accesso = now(),
+        updated_at = now()
+    where id = v_id;
+  end if;
 
   return v_id;
 end;

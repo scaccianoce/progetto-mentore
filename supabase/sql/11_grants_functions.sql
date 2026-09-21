@@ -206,11 +206,11 @@ GRANT EXECUTE ON FUNCTION public."notifiche_materializza_regole_temporali"() TO 
 REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_materializza_regole_temporali"() FROM service_role;
 GRANT EXECUTE ON FUNCTION public."notifiche_materializza_regole_temporali"() TO service_role;
 
-REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text) TO authenticated;
+REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text, p_device_id text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text, p_device_id text) TO authenticated;
 
-REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text) FROM service_role;
-GRANT EXECUTE ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text) TO service_role;
+REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text, p_device_id text) FROM service_role;
+GRANT EXECUTE ON FUNCTION public."notifiche_registra_dispositivo"(p_token text, p_piattaforma text, p_device_id text) TO service_role;
 
 REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_segna_letta"(p_destinatario_id uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public."notifiche_segna_letta"(p_destinatario_id uuid) TO authenticated;

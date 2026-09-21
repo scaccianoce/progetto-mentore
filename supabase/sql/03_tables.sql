@@ -198,6 +198,7 @@ CREATE TABLE IF NOT EXISTS public."notifiche_dispositivi" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
   "user_id" uuid NOT NULL,
   "token" text NOT NULL,
+  "device_id" text,
   "piattaforma" "public"."notifiche_piattaforma" NOT NULL,
   "attivo" boolean DEFAULT true NOT NULL,
   "ultimo_accesso" timestamptz,
@@ -362,4 +363,3 @@ CREATE TABLE IF NOT EXISTS public."user_roles" (
   "user_id" uuid NOT NULL,
   "role" "public"."app_role" DEFAULT 'participant'::app_role NOT NULL
 );
-

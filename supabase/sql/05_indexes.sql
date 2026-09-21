@@ -45,6 +45,7 @@ CREATE INDEX IF NOT EXISTS notifiche_destinatari_stato_idx ON public.notifiche_d
 -- notifiche_destinatari_unique: creato automaticamente dal relativo constraint.
 CREATE INDEX IF NOT EXISTS notifiche_destinatari_user_idx ON public.notifiche_destinatari USING btree (user_id);
 CREATE INDEX IF NOT EXISTS notifiche_dispositivi_attivo_idx ON public.notifiche_dispositivi USING btree (attivo);
+CREATE UNIQUE INDEX IF NOT EXISTS notifiche_dispositivi_device_id_unique ON public.notifiche_dispositivi USING btree (device_id) WHERE (device_id IS NOT NULL);
 -- notifiche_dispositivi_pkey: creato automaticamente dal relativo constraint.
 -- notifiche_dispositivi_token_unique: creato automaticamente dal relativo constraint.
 CREATE INDEX IF NOT EXISTS notifiche_dispositivi_user_idx ON public.notifiche_dispositivi USING btree (user_id);
