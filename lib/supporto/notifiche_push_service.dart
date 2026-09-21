@@ -21,6 +21,12 @@ class NotifichePushService {
 
   FirebaseMessaging get _messaging => FirebaseMessaging.instance;
 
+  Future<String?> _recuperaToken() => _messaging.getToken(
+        vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
+        serviceWorkerScriptPath:
+            kIsWeb ? 'firebase-messaging-sw.js' : null,
+      );
+
   /// Incrementato quando arriva o viene aperta una notifica.
   final ValueNotifier<int> aggiornamenti = ValueNotifier<int>(0);
 
@@ -193,9 +199,7 @@ class NotifichePushService {
     if (!_repository.utenteAutenticato) return false;
 
     try {
-      final token = await _messaging.getToken(
-        vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
-      );
+      final token = await _recuperaToken();
 
       if (token == null || token.trim().isEmpty) {
         _errore = 'Firebase non ha restituito un token FCM.';
@@ -253,9 +257,7 @@ class NotifichePushService {
 
     if (token == null || token.isEmpty) {
       try {
-        token = await _messaging.getToken(
-          vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
-        );
+        token = await _recuperaToken();
       } catch (_) {
         return;
       }
