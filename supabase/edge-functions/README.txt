@@ -5,6 +5,7 @@ Le Edge Functions NON sono incluse nel dump SQL PostgreSQL.
 
 Sorgenti presenti localmente:
 - notifiche-invia
+- notifiche-push-test
 - backoffice-user-admin
 - smart-task
 - mentoraggi-google-sheet
@@ -24,3 +25,20 @@ Operazione consigliata, solo dal Dashboard:
 3. Collocarlo in questa cartella, una sottocartella per funzione.
 
 Non inserire qui valori segreti.
+
+
+TEST PUSH SINGOLO
+=================
+
+La funzione notifiche-push-test non usa tabelle del database. Richiede i secret
+FIREBASE_SERVICE_ACCOUNT_JSON e NOTIFICHE_CRON_SECRET e accetta via POST:
+
+{
+  "token": "TOKEN_FCM_DEL_DISPOSITIVO",
+  "titolo": "Test push",
+  "messaggio": "Notifica di prova"
+}
+
+Il campo token e' obbligatorio; titolo e messaggio sono facoltativi.
+La verifica JWT e' disattivata per consentire la chiamata da pg_net; la funzione
+verifica internamente l'header x-cron-secret.

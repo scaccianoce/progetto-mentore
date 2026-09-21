@@ -2,3 +2,7 @@
 # Nel Dashboard equivale a disabilitare "Verify JWT" per questa funzione.
 [functions.notifiche-invia]
 verify_jwt = false
+
+# La funzione verifica internamente l'header x-cron-secret.
+[functions.notifiche-push-test]
+verify_jwt = false
