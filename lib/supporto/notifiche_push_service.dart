@@ -54,11 +54,6 @@ class NotifichePushService {
   int _versioneSessionePush = 0;
   Future<void> _codaOperazioniPush = Future<void>.value();
   Future<String>? _deviceIdFuture;
-  String? _ultimoToken;
-  String? _errore;
-
-  String? get errore => _errore;
-  bool get inizializzato => _inizializzato;
 
   /// Inizializza il canale FCM e collega i listener del dispositivo.
   Future<void> inizializza() async {
@@ -81,16 +76,18 @@ class NotifichePushService {
       _tokenSubscription ??= _messaging.onTokenRefresh.listen(
         (token) => unawaited(_accodaRegistrazioneToken(token)),
         onError: (Object errore) {
-          _errore = 'Aggiornamento token FCM non riuscito: $errore';
-          debugPrint('[PushService] $_errore');
+          debugPrint(
+            '[PushService] Aggiornamento token FCM non riuscito: $errore',
+          );
         },
       );
 
       _authSubscription ??= _repository.cambiUtenteAutenticato.listen(
         (userId) => unawaited(_accodaCambioUtente(userId)),
         onError: (Object errore) {
-          _errore = 'Aggiornamento sessione push non riuscito: $errore';
-          debugPrint('[PushService] $_errore');
+          debugPrint(
+            '[PushService] Aggiornamento sessione push non riuscito: $errore',
+          );
         },
       );
 
@@ -127,8 +124,7 @@ class NotifichePushService {
         });
       }
     } catch (errore) {
-      _errore = 'Notifiche push non inizializzate: $errore';
-      debugPrint('[PushService] $_errore');
+      debugPrint('[PushService] Notifiche push non inizializzate: $errore');
       _inizializzato = false;
     }
   }
@@ -156,7 +152,6 @@ class NotifichePushService {
       if (!await _tokenGiaDisattivato()) {
         await _cancellaTokenLocale();
       }
-      _ultimoToken = null;
       return;
     }
 
@@ -173,15 +168,14 @@ class NotifichePushService {
       if (versione != _versioneSessionePush) return;
 
       if (impostazioni.authorizationStatus == AuthorizationStatus.denied) {
-        _errore = 'Permesso notifiche non concesso.';
+        debugPrint('[PushService] Permesso notifiche non concesso.');
         return;
       }
 
-      await sincronizzaDispositivo();
+      await _registraDispositivoCorrente();
       await aggiornaNonLette();
     } catch (errore) {
-      _errore = 'Attivazione notifiche non riuscita: $errore';
-      debugPrint('[PushService] $_errore');
+      debugPrint('[PushService] Attivazione notifiche non riuscita: $errore');
     }
   }
 
@@ -199,26 +193,24 @@ class NotifichePushService {
     }
   }
 
-  /// Recupera il token FCM corrente e lo sincronizza con il backend.
-  Future<bool> sincronizzaDispositivo() async {
-    if (!_inizializzato || Firebase.apps.isEmpty) return false;
-    if (!_registrazioneConsentita) return false;
-    if (!_repository.utenteAutenticato) return false;
+  /// Registra l'installazione quando si apre una sessione autenticata.
+  Future<void> _registraDispositivoCorrente() async {
+    if (!_inizializzato || Firebase.apps.isEmpty) return;
+    if (!_registrazioneConsentita || !_repository.utenteAutenticato) return;
 
     try {
       final token = await _recuperaToken();
 
       if (token == null || token.trim().isEmpty) {
-        _errore = 'Firebase non ha restituito un token FCM.';
-        return false;
+        debugPrint('[PushService] Firebase non ha restituito un token FCM.');
+        return;
       }
 
       await _registraToken(token);
-      return _ultimoToken == token && _errore == null;
     } catch (errore) {
-      _errore = 'Registrazione dispositivo non riuscita: $errore';
-      debugPrint('[PushService] $_errore');
-      return false;
+      debugPrint(
+        '[PushService] Registrazione dispositivo non riuscita: $errore',
+      );
     }
   }
 
@@ -243,11 +235,10 @@ class NotifichePushService {
         deviceId: deviceId,
       );
       await _salvaTokenDisattivato(false);
-      _ultimoToken = token;
-      _errore = null;
     } catch (errore) {
-      _errore = 'Impossibile registrare il dispositivo: $errore';
-      debugPrint('[PushService] $_errore');
+      debugPrint(
+        '[PushService] Impossibile registrare il dispositivo: $errore',
+      );
     }
   }
 
@@ -259,25 +250,13 @@ class NotifichePushService {
     return _codaOperazioniPush;
   }
 
-  /// Disattiva il token corrente prima del logout.
-  Future<bool> disattivaDispositivoCorrente() async {
+  /// Disattiva l'installazione corrente prima del logout.
+  Future<bool> _disattivaDispositivoCorrente() async {
     if (!_repository.utenteAutenticato) return false;
 
-    String? token = _ultimoToken;
-
-    if (token == null || token.isEmpty) {
-      try {
-        token = await _recuperaToken();
-      } catch (_) {
-        return false;
-      }
-    }
-
-    if (token == null || token.isEmpty) return true;
-
     try {
-      await _repository.disattivaDispositivo(token);
-      _ultimoToken = null;
+      final deviceId = await _deviceIdInstallazione();
+      await _repository.disattivaDispositivo(deviceId);
       return true;
     } catch (_) {
       // Il logout non deve essere bloccato dalla disattivazione del push.
@@ -300,12 +279,12 @@ class NotifichePushService {
     _codaOperazioniPush = _codaOperazioniPush.then<void>(
       (_) async {
         if (versione != _versioneSessionePush) return;
-        final disattivato = await disattivaDispositivoCorrente();
+        final disattivato = await _disattivaDispositivoCorrente();
         await _salvaTokenDisattivato(disattivato);
       },
       onError: (_) async {
         if (versione != _versioneSessionePush) return;
-        final disattivato = await disattivaDispositivoCorrente();
+        final disattivato = await _disattivaDispositivoCorrente();
         await _salvaTokenDisattivato(disattivato);
       },
     );
@@ -367,18 +346,16 @@ class NotifichePushService {
 
   Future<void> _cancellaTokenLocale() async {
     if (Firebase.apps.isEmpty) {
-      _ultimoToken = null;
       return;
     }
 
     try {
       await _messaging.deleteToken();
-      _ultimoToken = null;
       await _salvaTokenDisattivato(true);
     } catch (errore) {
-      _errore =
-          'Impossibile cancellare il token locale del dispositivo: $errore';
-      debugPrint('[PushService] $_errore');
+      debugPrint(
+        '[PushService] Impossibile cancellare il token locale: $errore',
+      );
     }
   }
 

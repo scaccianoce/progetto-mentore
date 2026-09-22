@@ -9,11 +9,7 @@ import '../supporto/notifiche_push_service.dart';
 import 'menu_controller.dart';
 
 class MenuPage extends StatefulWidget {
-  const MenuPage({
-    super.key,
-    required this.contenuto,
-    required this.sessione,
-  });
+  const MenuPage({super.key, required this.contenuto, required this.sessione});
 
   final Widget contenuto;
   final SessioneController sessione;
@@ -22,48 +18,36 @@ class MenuPage extends StatefulWidget {
   State<MenuPage> createState() => _MenuPageState();
 }
 
-class _MenuPageState extends State<MenuPage> 
-    with WidgetsBindingObserver{
+class _MenuPageState extends State<MenuPage> with WidgetsBindingObserver {
   late final MenuNovitaController _novitaController;
-  
+
   Timer? _timerNovita;
 
   String? _ultimoPercorsoRegistrato;
-  
-@override
-void initState() {
-  super.initState();
 
-  WidgetsBinding.instance.addObserver(this);
+  @override
+  void initState() {
+    super.initState();
 
-  _novitaController = MenuNovitaController(
-    database: widget.sessione.db,
-  );
+    WidgetsBinding.instance.addObserver(this);
 
-  unawaited(_novitaController.carica());
+    _novitaController = MenuNovitaController(database: widget.sessione.db);
 
-  NotifichePushService.instance.aggiornamenti.addListener(
-    _aggiornaNovita,
-  );
+    unawaited(_novitaController.carica());
 
-  _timerNovita = Timer.periodic(
-    const Duration(seconds: 30),
-    (_) {
+    NotifichePushService.instance.aggiornamenti.addListener(_aggiornaNovita);
+
+    _timerNovita = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
 
       unawaited(_novitaController.carica());
-    },
-  );
-}
-
+    });
+  }
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_novitaController.carica());
-      unawaited(NotifichePushService.instance.sincronizzaDispositivo());
     }
   }
 
@@ -72,12 +56,9 @@ void initState() {
     super.didChangeDependencies();
 
     final percorsoCorrente = GoRouterState.of(context).uri.path;
-    final percorsoMenu = AppMenuController.percorsoMenu(
-      percorsoCorrente,
-    );
+    final percorsoMenu = AppMenuController.percorsoMenu(percorsoCorrente);
 
-    if (percorsoMenu == null ||
-        percorsoMenu == _ultimoPercorsoRegistrato) {
+    if (percorsoMenu == null || percorsoMenu == _ultimoPercorsoRegistrato) {
       return;
     }
 
@@ -98,9 +79,7 @@ void initState() {
   void dispose() {
     _timerNovita?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    NotifichePushService.instance.aggiornamenti.removeListener(
-      _aggiornaNovita,
-    );
+    NotifichePushService.instance.aggiornamenti.removeListener(_aggiornaNovita);
     _novitaController.dispose();
     super.dispose();
   }
@@ -112,25 +91,17 @@ void initState() {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge(
-        <Listenable>[
-          widget.sessione,
-          _novitaController,
-        ],
-      ),
+      animation: Listenable.merge(<Listenable>[
+        widget.sessione,
+        _novitaController,
+      ]),
       builder: (BuildContext context, Widget? child) {
-        final AppRole ruolo =
-            widget.sessione.ruolo ?? AppRole.participant;
-        final String percorso =
-            GoRouterState.of(context).uri.path;
-        final List<VoceMenu> voci =
-            AppMenuController.vociPerRuolo(ruolo);
+        final AppRole ruolo = widget.sessione.ruolo ?? AppRole.participant;
+        final String percorso = GoRouterState.of(context).uri.path;
+        final List<VoceMenu> voci = AppMenuController.vociPerRuolo(ruolo);
 
         return LayoutBuilder(
-          builder: (
-            BuildContext context,
-            BoxConstraints constraints,
-          ) {
+          builder: (BuildContext context, BoxConstraints constraints) {
             final bool desktop = constraints.maxWidth >= 900;
 
             if (desktop) {
@@ -159,16 +130,10 @@ void initState() {
 
             return Scaffold(
               appBar: AppBar(
-                title: Text(
-                  AppMenuController.titoloPercorso(
-                    percorso,
-                    ruolo,
-                  ),
-                ),
+                title: Text(AppMenuController.titoloPercorso(percorso, ruolo)),
               ),
               drawer: SafeArea(
-                minimum:
-                    const EdgeInsets.fromLTRB(8, 8, 8, 12),
+                minimum: const EdgeInsets.fromLTRB(8, 8, 8, 12),
                 child: Drawer(
                   child: _PannelloMenu(
                     voci: voci,
@@ -228,9 +193,7 @@ class _PannelloMenu extends StatelessWidget {
                 const Expanded(
                   child: Text(
                     'Progetto Mentore\nper la Didattica',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                 ),
               ],
@@ -239,8 +202,7 @@ class _PannelloMenu extends StatelessWidget {
           const Divider(height: 1),
           Expanded(
             child: ListView(
-              padding:
-                  const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: _creaVoci(context),
             ),
           ),
@@ -276,12 +238,10 @@ class _PannelloMenu extends StatelessWidget {
         if (voce.sezione.titolo.isNotEmpty) {
           elementi.add(
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(16, 18, 16, 6),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
               child: Text(
                 voce.sezione.titolo,
-                style:
-                    Theme.of(context).textTheme.labelMedium,
+                style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
           );
@@ -307,10 +267,7 @@ class _PannelloMenu extends StatelessWidget {
     return elementi;
   }
 
-  Widget? _trailingVoce(
-    BuildContext context,
-    VoceMenu voce,
-  ) {
+  Widget? _trailingVoce(BuildContext context, VoceMenu voce) {
     if (voce.percorso == '/notifiche') {
       return const _NotificheBadge();
     }
@@ -333,18 +290,13 @@ class _NotificheBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int>(
-      valueListenable:
-          NotifichePushService.instance.nonLette,
+      valueListenable: NotifichePushService.instance.nonLette,
       builder: (context, nonLette, _) {
         if (nonLette <= 0) {
           return const SizedBox.shrink();
         }
 
-        return Badge(
-          label: Text(
-            nonLette > 99 ? '99+' : '$nonLette',
-          ),
-        );
+        return Badge(label: Text(nonLette > 99 ? '99+' : '$nonLette'));
       },
     );
   }

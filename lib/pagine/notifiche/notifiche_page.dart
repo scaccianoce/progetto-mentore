@@ -25,7 +25,7 @@ class _NotifichePageState extends State<NotifichePage> {
   void initState() {
     super.initState();
     _controller = NotificheController();
-    unawaited(_aggiorna());
+    unawaited(_controller.carica());
     NotifichePushService.instance.aggiornamenti.addListener(_pushRicevuta);
   }
 
@@ -42,24 +42,6 @@ class _NotifichePageState extends State<NotifichePage> {
     _controller.carica();
   }
 
-  /// Ricarica le notifiche e ripristina, se necessario, la registrazione FCM.
-  Future<void> _aggiorna({bool mostraEsitoPush = false}) async {
-    final push = NotifichePushService.instance;
-    final registrato = await push.sincronizzaDispositivo();
-    await _controller.carica();
-
-    if (!mounted || !mostraEsitoPush) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          registrato
-              ? 'Dispositivo registrato per le notifiche push.'
-              : push.errore ?? 'Registrazione push non riuscita.',
-        ),
-      ),
-    );
-  }
-
   /// Costruisce l’interfaccia grafica di questo componente.
   @override
   Widget build(BuildContext context) {
@@ -67,90 +49,92 @@ class _NotifichePageState extends State<NotifichePage> {
       animation: _controller,
       builder: (context, _) => Scaffold(
         body: SafeArea(
-        minimum: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    'Notifiche recenti',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                ),
-                if (_controller.nonLette > 0)
-                  Badge(label: Text('${_controller.nonLette}')),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Aggiorna',
-                  onPressed: _controller.caricamento
-                      ? null
-                      : () => _aggiorna(mostraEsitoPush: true),
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Qui trovi le ultime ${_controller.limite} notifiche destinate al tuo account.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 16),
-            if (_controller.caricamento) const LinearProgressIndicator(),
-            if (_controller.errore != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(_controller.errore!),
-              ),
-            Expanded(
-              child: _controller.notifiche.isEmpty && !_controller.caricamento
-                  ? const Center(child: Text('Nessuna notifica recente.'))
-                  : ListView.separated(
-                      itemCount: _controller.notifiche.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final notifica = _controller.notifiche[index];
-                        return Card(
-                          child: ListTile(
-                            leading: Icon(
-                              notifica.letta
-                                  ? Icons.notifications_none
-                                  : Icons.notifications_active,
-                            ),
-                            title: Text(
-                              notifica.titolo,
-                              style: TextStyle(
-                                fontWeight: notifica.letta
-                                    ? FontWeight.normal
-                                    : FontWeight.w700,
-                              ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(notifica.messaggio),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    _sottotitolo(notifica),
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            trailing: notifica.letta
-                                ? null
-                                : const Icon(Icons.circle, size: 10),
-                            onTap: () => _apri(notifica),
-                          ),
-                        );
-                      },
+          minimum: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      'Notifiche recenti',
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-            ),
-          ],
-        ),
+                  ),
+                  if (_controller.nonLette > 0)
+                    Badge(label: Text('${_controller.nonLette}')),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Aggiorna',
+                    onPressed: _controller.caricamento
+                        ? null
+                        : _controller.carica,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Qui trovi le ultime ${_controller.limite} notifiche destinate al tuo account.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              if (_controller.caricamento) const LinearProgressIndicator(),
+              if (_controller.errore != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(_controller.errore!),
+                ),
+              Expanded(
+                child: _controller.notifiche.isEmpty && !_controller.caricamento
+                    ? const Center(child: Text('Nessuna notifica recente.'))
+                    : ListView.separated(
+                        itemCount: _controller.notifiche.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          final notifica = _controller.notifiche[index];
+                          return Card(
+                            child: ListTile(
+                              leading: Icon(
+                                notifica.letta
+                                    ? Icons.notifications_none
+                                    : Icons.notifications_active,
+                              ),
+                              title: Text(
+                                notifica.titolo,
+                                style: TextStyle(
+                                  fontWeight: notifica.letta
+                                      ? FontWeight.normal
+                                      : FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(notifica.messaggio),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      _sottotitolo(notifica),
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              trailing: notifica.letta
+                                  ? null
+                                  : const Icon(Icons.circle, size: 10),
+                              onTap: () => _apri(notifica),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -161,9 +145,9 @@ class _NotifichePageState extends State<NotifichePage> {
     final errore = await _controller.segnaComeLetta(notifica);
     if (!mounted) return;
     if (errore != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errore)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(errore)));
       return;
     }
     NotifichePushService.instance.aggiornamenti.value++;

@@ -179,11 +179,11 @@ GRANT EXECUTE ON FUNCTION public."notifiche_crea_messaggio_da_regola"(p_regola_i
 REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_dettaglio_destinatari"(p_messaggio_id uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public."notifiche_dettaglio_destinatari"(p_messaggio_id uuid) TO authenticated;
 
-REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_disattiva_dispositivo"(p_token text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public."notifiche_disattiva_dispositivo"(p_token text) TO authenticated;
+REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_disattiva_dispositivo"(p_device_id text) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public."notifiche_disattiva_dispositivo"(p_device_id text) TO authenticated;
 
-REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_disattiva_dispositivo"(p_token text) FROM service_role;
-GRANT EXECUTE ON FUNCTION public."notifiche_disattiva_dispositivo"(p_token text) TO service_role;
+REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_disattiva_dispositivo"(p_device_id text) FROM service_role;
+GRANT EXECUTE ON FUNCTION public."notifiche_disattiva_dispositivo"(p_device_id text) TO service_role;
 
 REVOKE ALL PRIVILEGES ON FUNCTION public."notifiche_elenco_utenti_attivi"() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public."notifiche_elenco_utenti_attivi"() TO authenticated;

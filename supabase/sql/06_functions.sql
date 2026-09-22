@@ -639,9 +639,9 @@ end;
 $function$;
 
 -- --------------------------------------------------------------------------
--- notifiche_disattiva_dispositivo(p_token text)
+-- notifiche_disattiva_dispositivo(p_device_id text)
 -- --------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.notifiche_disattiva_dispositivo(p_token text)
+CREATE OR REPLACE FUNCTION public.notifiche_disattiva_dispositivo(p_device_id text)
  RETURNS boolean
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -655,11 +655,16 @@ begin
     raise exception 'Utente non autenticato';
   end if;
 
+  p_device_id := btrim(p_device_id);
+  if p_device_id is null or p_device_id = '' then
+    raise exception 'Identificatore installazione mancante';
+  end if;
+
   update public.notifiche_dispositivi
   set
     attivo = false,
     updated_at = now()
-  where token = p_token
+  where device_id = p_device_id
     and user_id = v_user_id;
 
   get diagnostics v_count = row_count;

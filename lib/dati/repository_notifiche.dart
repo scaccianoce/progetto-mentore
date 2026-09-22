@@ -64,10 +64,10 @@ class NotificheRepository {
     );
   }
 
-  Future<void> disattivaDispositivo(String token) async {
+  Future<void> disattivaDispositivo(String deviceId) async {
     await _database.rpc(
       'notifiche_disattiva_dispositivo',
-      parametri: <String, dynamic>{'p_token': token},
+      parametri: <String, dynamic>{'p_device_id': deviceId},
     );
   }
 
