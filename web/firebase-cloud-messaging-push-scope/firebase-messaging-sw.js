@@ -1,9 +1,11 @@
+const appBaseUrl = new URL('../', self.registration.scope);
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const link = event.notification.data?.link || new URL(
-    './#/notifiche',
-    self.registration.scope
+    '#/notifiche',
+    appBaseUrl
   ).href;
 
   event.waitUntil(
@@ -45,13 +47,10 @@ messaging.onBackgroundMessage((message) => {
   if (message.notification) return;
 
   const data = message.data || {};
-  const iconUrl = new URL(
-    'icons/Icon-192.png',
-    self.registration.scope
-  ).href;
+  const iconUrl = new URL('icons/Icon-192.png', appBaseUrl).href;
   const linkUrl = new URL(
-    data.link || './#/notifiche',
-    self.registration.scope
+    data.link || '#/notifiche',
+    appBaseUrl
   ).href;
 
   return self.registration.showNotification(

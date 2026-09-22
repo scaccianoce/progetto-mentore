@@ -128,6 +128,13 @@ abstract final class AppMenuController {
       ruoli: _soloOwner,
     ),
     VoceMenu(
+      titolo: 'Google Sheet',
+      icona: Icons.table_view_outlined,
+      percorso: '/gestione/google-sheet',
+      sezione: MenuSezione.gestione,
+      ruoli: _soloOwner,
+    ),
+    VoceMenu(
       titolo: 'Partecipanti',
       icona: Icons.people_outline,
       percorso: '/gestione/partecipanti',
@@ -180,8 +187,7 @@ abstract final class AppMenuController {
   static bool puoAprire(String percorso, AppRole ruolo) {
     return voci.any(
       (VoceMenu voce) =>
-          percorso.startsWith(voce.percorso) &&
-          voce.visibilePer(ruolo),
+          percorso.startsWith(voce.percorso) && voce.visibilePer(ruolo),
     );
   }
 
@@ -209,9 +215,7 @@ abstract final class AppMenuController {
 ///
 /// Il badge numerico di `/notifiche` resta gestito dal sottosistema notifiche.
 class MenuNovitaController extends ChangeNotifier {
-  MenuNovitaController({
-    required this.database,
-  });
+  MenuNovitaController({required this.database});
 
   final DatabaseRepository database;
 
@@ -246,8 +250,7 @@ class MenuNovitaController extends ChangeNotifier {
     } catch (e) {
       _errore = AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile aggiornare gli indicatori del menu.',
+        messaggioGenerico: 'Impossibile aggiornare gli indicatori del menu.',
       ).messaggio;
     } finally {
       _caricamento = false;
@@ -260,25 +263,19 @@ class MenuNovitaController extends ChangeNotifier {
     if (database.userIdCorrente == null) return;
 
     if (_novita[percorso] == true) {
-      _novita = <String, bool>{
-        ..._novita,
-        percorso: false,
-      };
+      _novita = <String, bool>{..._novita, percorso: false};
       notifyListeners();
     }
 
     try {
       await database.rpc(
         'menu_registra_accesso',
-        parametri: <String, dynamic>{
-          'p_percorso': percorso,
-        },
+        parametri: <String, dynamic>{'p_percorso': percorso},
       );
     } catch (e) {
       _errore = AppErrorMapper.converti(
         e,
-        messaggioGenerico:
-            'Impossibile registrare l’accesso alla sezione.',
+        messaggioGenerico: 'Impossibile registrare l’accesso alla sezione.',
       ).messaggio;
       notifyListeners();
     }

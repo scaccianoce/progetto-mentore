@@ -11,10 +11,17 @@ Sorgenti presenti localmente:
 - mentoraggi-google-sheet
 
 La funzione mentoraggi-google-sheet viene invocata dal trigger PostgreSQL
-sync_mentoraggi_google_sheet e legge le variabili di ambiente:
-- GOOGLE_SCRIPT_URL
-- GOOGLE_SCRIPT_SECRET
+sync_mentoraggi_google_sheet. Dopo l'esecuzione di
+sql/31_google_sheet_configurabile.sql legge URL, secret cifrato e mappature
+dalla configurazione attiva. Le variabili GOOGLE_SCRIPT_URL e
+GOOGLE_SCRIPT_SECRET restano come fallback compatibile se non esiste ancora
+una configurazione attiva.
+
+Richiede inoltre:
 - secret:google_sheet_sync (gestito dalla configurazione withSupabase)
+
+Il modello di Web App da distribuire in Google Apps Script e' disponibile in:
+- ../google-apps-script/google_sheet_sync.gs
 
 Per una ricostruzione realmente completa servono i sorgenti ATTUALI di tutte le
 Edge Functions presenti nel Dashboard Supabase.

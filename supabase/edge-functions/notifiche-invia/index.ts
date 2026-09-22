@@ -1,6 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nodemailer from 'npm:nodemailer@6'
 
+const WEB_APP_URL = (
+  Deno.env.get('WEB_APP_URL')?.trim() ||
+  'https://scaccianoce.github.io/progetto-mentore'
+).replace(/\/+$/, '')
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
@@ -223,10 +228,11 @@ async function inviaFcm(
             notification: {
               title: String(messaggio.titolo ?? 'Notifica'),
               body: String(messaggio.messaggio ?? ''),
-              icon: '/icons/Icon-192.png',
+              icon: `${WEB_APP_URL}/icons/Icon-192.png`,
+              badge: `${WEB_APP_URL}/icons/Icon-192.png`,
             },
             fcm_options: {
-              link: '/#/notifiche',
+              link: `${WEB_APP_URL}/#/notifiche`,
             },
           },
         },

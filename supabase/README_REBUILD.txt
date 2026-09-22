@@ -37,6 +37,7 @@ Poi:
 15_profilo_partecipazioni_annuali.sql
 16_menu_novita.sql
 17_mentoraggi_google_sheet.sql
+31_google_sheet_configurabile.sql
 
 Infine:
 14_verify.sql

@@ -41,7 +41,14 @@
       if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
       if (Notification.permission !== 'granted') return;
 
-      const registrazione = await navigator.serviceWorker.ready;
+      const scopeFirebase = new URL(
+        'firebase-cloud-messaging-push-scope/',
+        document.baseURI
+      );
+      const registrazioneFirebase = await navigator.serviceWorker
+        .getRegistration(scopeFirebase.href);
+      const registrazione = registrazioneFirebase ||
+        await navigator.serviceWorker.ready;
       const icona = new URL('icons/Icon-192.png', document.baseURI).href;
       const destinazione = new URL(
         link || './#/notifiche',

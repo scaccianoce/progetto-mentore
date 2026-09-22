@@ -8,7 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../configurazione/firebase_config.dart';
 import '../dati/repository.dart';
-import 'notifica_sistema.dart';
+import 'notifica_sistema_stub.dart'
+    if (dart.library.js_interop) 'notifica_sistema_web.dart';
 
 /// Gestisce esclusivamente il canale push FCM del dispositivo.
 ///
@@ -28,7 +29,12 @@ class NotifichePushService {
 
   Future<String?> _recuperaToken() => _messaging.getToken(
     vapidKey: kIsWeb ? FirebaseConfig.webVapidKey : null,
-    serviceWorkerScriptPath: kIsWeb ? 'firebase-messaging-sw.js' : null,
+    // Il worker FCM deve avere uno scope distinto dal worker PWA di Flutter.
+    // Se entrambi sono nella root, il browser li considera la stessa
+    // registrazione e l'ultimo aggiornamento sostituisce l'altro.
+    serviceWorkerScriptPath: kIsWeb
+        ? 'firebase-cloud-messaging-push-scope/firebase-messaging-sw.js'
+        : null,
   );
 
   /// Incrementato quando arriva o viene aperta una notifica.

@@ -6,6 +6,7 @@ import '../menu/menu_page.dart';
 import '../pagine/backoffice/anni_accademici/anni_accademici_backoffice_page.dart';
 import '../pagine/backoffice/controllo_partecipanti/controllo_partecipanti_backoffice_page.dart';
 import '../pagine/backoffice/database/database_backoffice_page.dart';
+import '../pagine/backoffice/google_sheet/google_sheet_page.dart';
 import '../pagine/backoffice/insegnamenti/insegnamenti_backoffice_page.dart';
 import '../pagine/backoffice/notifiche/notifiche_backoffice_page.dart';
 import '../pagine/backoffice/partecipanti/partecipanti_backoffice_page.dart';
@@ -105,6 +106,10 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
           builder: (_, _) => DatabaseBackofficePage(sessione: sessione),
         ),
         GoRoute(
+          path: '/gestione/google-sheet',
+          builder: (_, _) => GoogleSheetPage(sessione: sessione),
+        ),
+        GoRoute(
           path: '/gestione/partecipanti',
           builder: (_, _) => PartecipantiBackofficePage(sessione: sessione),
         ),
@@ -126,8 +131,7 @@ GoRouter creaAppRouter(SessioneController sessione) => GoRouter(
         GoRoute(
           path: '/gestione/questionari',
           builder: (_, _) => QuestionariBackofficePage(
-            controller: QuestionariBackofficeController(sessione)
-              ..carica(),
+            controller: QuestionariBackofficeController(sessione)..carica(),
           ),
         ),
         GoRoute(
