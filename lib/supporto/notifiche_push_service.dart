@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../configurazione/firebase_config.dart';
 import '../dati/repository.dart';
+import 'notifica_sistema.dart';
 
 /// Gestisce esclusivamente il canale push FCM del dispositivo.
 ///
@@ -38,11 +39,8 @@ class NotifichePushService {
 
   final StreamController<RemoteMessage> _apertureController =
       StreamController<RemoteMessage>.broadcast();
-  final StreamController<RemoteMessage> _foregroundController =
-      StreamController<RemoteMessage>.broadcast();
 
   Stream<RemoteMessage> get apertureNotifiche => _apertureController.stream;
-  Stream<RemoteMessage> get notificheForeground => _foregroundController.stream;
 
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<String?>? _authSubscription;
@@ -97,7 +95,24 @@ class NotifichePushService {
         if (!_repository.utenteAutenticato) return;
         aggiornamenti.value++;
         unawaited(aggiornaNonLette());
-        _foregroundController.add(messaggio);
+        unawaited(
+          mostraNotificaSistema(
+            titolo:
+                messaggio.notification?.title ??
+                messaggio.data['titolo']?.toString() ??
+                'Progetto Mentore',
+            messaggio:
+                messaggio.notification?.body ??
+                messaggio.data['messaggio']?.toString() ??
+                'Hai ricevuto una nuova notifica.',
+            link: messaggio.data['link']?.toString() ?? './#/notifiche',
+          ).catchError((Object errore) {
+            debugPrint(
+              '[PushService] Notifica di sistema in primo piano non riuscita: '
+              '$errore',
+            );
+          }),
+        );
       });
 
       _openedSubscription ??= FirebaseMessaging.onMessageOpenedApp.listen((
@@ -400,9 +415,6 @@ class NotifichePushService {
 
     if (!_apertureController.isClosed) {
       await _apertureController.close();
-    }
-    if (!_foregroundController.isClosed) {
-      await _foregroundController.close();
     }
   }
 }

@@ -20,10 +20,6 @@ class _MentoreAppState extends State<MentoreApp> {
   SessioneController? sessione;
   GoRouter? router;
   StreamSubscription<dynamic>? _notificheAperteSubscription;
-  StreamSubscription<dynamic>? _notificheForegroundSubscription;
-
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
-      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -33,54 +29,21 @@ class _MentoreAppState extends State<MentoreApp> {
       unawaited(sessione!.inizializza());
       router = creaAppRouter(sessione!);
 
-      _notificheAperteSubscription =
-          NotifichePushService.instance.apertureNotifiche.listen((messaggio) {
-        final percorso =
-            NotifichePushService.instance.percorsoPer(messaggio);
-        router?.go(percorso);
-      });
-
-      _notificheForegroundSubscription =
-          NotifichePushService.instance.notificheForeground.listen((messaggio) {
-        final titolo = messaggio.notification?.title ?? 'Nuova notifica';
-        final corpo = messaggio.notification?.body ?? '';
-        final messenger = _scaffoldMessengerKey.currentState;
-        if (messenger == null) return;
-
-        messenger
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              duration: const Duration(seconds: 7),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    titolo,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  if (corpo.trim().isNotEmpty) Text(corpo),
-                ],
-              ),
-              action: SnackBarAction(
-                label: 'Apri',
-                onPressed: () {
-                  final percorso =
-                      NotifichePushService.instance.percorsoPer(messaggio);
-                  router?.go(percorso);
-                },
-              ),
-            ),
-          );
-      });
+      _notificheAperteSubscription = NotifichePushService
+          .instance
+          .apertureNotifiche
+          .listen((messaggio) {
+            final percorso = NotifichePushService.instance.percorsoPer(
+              messaggio,
+            );
+            router?.go(percorso);
+          });
     }
   }
 
   @override
   void dispose() {
     _notificheAperteSubscription?.cancel();
-    _notificheForegroundSubscription?.cancel();
     router?.dispose();
     sessione?.dispose();
     super.dispose();
@@ -119,9 +82,7 @@ class _MentoreAppState extends State<MentoreApp> {
           side: const BorderSide(color: Color(0xFFD7E3F4)),
         ),
       ),
-      dialogTheme: const DialogThemeData(
-        backgroundColor: Color(0xFFFBFDFF),
-      ),
+      dialogTheme: const DialogThemeData(backgroundColor: Color(0xFFFBFDFF)),
     );
 
     if (widget.erroreAvvio != null) {
@@ -139,7 +100,6 @@ class _MentoreAppState extends State<MentoreApp> {
       title: 'Progetto Mentore per la Didattica',
       debugShowCheckedModeBanner: false,
       theme: tema,
-      scaffoldMessengerKey: _scaffoldMessengerKey,
       routerConfig: router!,
     );
   }

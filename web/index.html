@@ -33,6 +33,33 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <script>
+    // Firebase inoltra i messaggi alla pagina quando la PWA e' in primo piano.
+    // In quel caso il browser non crea automaticamente una notifica di sistema,
+    // quindi Flutter richiama questa funzione per mostrarla tramite il worker.
+    window.mentoreMostraNotifica = async function (titolo, messaggio, link) {
+      if (!('serviceWorker' in navigator) || !('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      const registrazione = await navigator.serviceWorker.ready;
+      const icona = new URL('icons/Icon-192.png', document.baseURI).href;
+      const destinazione = new URL(
+        link || './#/notifiche',
+        document.baseURI
+      ).href;
+
+      await registrazione.showNotification(
+        titolo || 'Progetto Mentore',
+        {
+          body: messaggio || 'Hai ricevuto una nuova notifica.',
+          icon: icona,
+          badge: icona,
+          data: { link: destinazione }
+        }
+      );
+    };
+  </script>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
